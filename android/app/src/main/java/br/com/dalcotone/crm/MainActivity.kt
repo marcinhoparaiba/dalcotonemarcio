@@ -66,7 +66,6 @@ class MainActivity:ComponentActivity(){
   var routeBatch by remember{mutableIntStateOf(0)}
   var routeCity by remember{mutableStateOf<String?>(null)}
   var routeAudience by remember{mutableStateOf("clientes")}
-  var routeAudience by remember{mutableStateOf("clientes")}
   var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
