@@ -5,8 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.drawable.BitmapDrawable
 import android.content.Context
 import android.content.pm.PackageManager
@@ -93,12 +91,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   Configuration.getInstance().userAgentValue=context.packageName
   MapView(context).apply{
    setTileSource(TileSourceFactory.MAPNIK)
-   overlayManager.tilesOverlay.setColorFilter(ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
-    -0.68f,0f,0f,0f,206f,
-    0f,-0.68f,0f,0f,209f,
-    0f,0f,-0.68f,0f,220f,
-    0f,0f,0f,1f,0f
-   ))))
+   // Standard tile rendering until the dark-map filter is verified on devices.
    setMultiTouchControls(true)
    zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
    controller.setZoom(13.5)
