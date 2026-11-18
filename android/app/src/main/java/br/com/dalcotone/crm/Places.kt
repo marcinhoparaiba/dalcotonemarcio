@@ -11,7 +11,7 @@ import org.json.JSONObject
 data class Prospect(val placeId:String,val name:String,val address:String,val latitude:Double?,val longitude:Double?)
 class PlacesRepository {
  private val client=OkHttpClient()
- suspend fun nearby(latitude:Double,longitude:Double):List<Prospect>=withContext(Dispatchers.IO){
+ suspend fun nearby(latitude:Double,longitude:Double):List<Prospect> = withContext(Dispatchers.IO){
   val key=BuildConfig.PLACES_API_KEY
   require(key.isNotBlank()){"Google Places não configurado"}
   val body=JSONObject().put("includedTypes",org.json.JSONArray().put("beauty_salon").put("hair_salon"))
