@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.drawable.BitmapDrawable
 import android.content.Context
 import android.content.pm.PackageManager
@@ -31,18 +32,46 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 
 private fun pin(context:Context,color:Int):BitmapDrawable{
  val d=context.resources.displayMetrics.density
- val size=(52*d).toInt().coerceAtLeast(52)
- val bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
+ val w=(48*d).toInt().coerceAtLeast(48)
+ val h=(62*d).toInt().coerceAtLeast(62)
+ val bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888)
  val canvas=Canvas(bitmap)
  val p=Paint(Paint.ANTI_ALIAS_FLAG)
+ val cx=w/2f
+ val r=w*0.35f
+ val cy=h*0.34f
+ val path=Path().apply{
+  moveTo(cx-r*0.85f,cy+r*0.45f)
+  cubicTo(cx-r*1.7f,cy-r*0.65f,cx-r*0.6f,cy-r*1.3f,cx,cy-r*1.3f)
+  cubicTo(cx+r*0.6f,cy-r*1.3f,cx+r*1.7f,cy-r*0.65f,cx+r*0.85f,cy+r*0.45f)
+  lineTo(cx,h*0.96f)
+  close()
+ }
  p.color=color
- canvas.drawCircle(size/2f,size*0.43f,size*0.37f,p)
+ canvas.drawPath(path,p)
  p.color=android.graphics.Color.WHITE
+ canvas.drawCircle(cx,cy,r*0.76f,p)
+ p.color=color
  p.textAlign=Paint.Align.CENTER
- p.textSize=size*0.43f
+ p.textSize=w*0.33f
  p.typeface=android.graphics.Typeface.DEFAULT_BOLD
- canvas.drawText("✂",size/2f,size*0.56f,p)
+ canvas.drawText("✂",cx,cy+w*0.115f,p)
  return BitmapDrawable(context.resources,bitmap)
+}
+private fun gpsDot(context:Context):BitmapDrawable{
+ val d=context.resources.displayMetrics.density
+ val size=(42*d).toInt().coerceAtLeast(42)
+ val bmp=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
+ val canvas=Canvas(bmp)
+ val p=Paint(Paint.ANTI_ALIAS_FLAG)
+ val c=size/2f
+ p.color=0x442979FF
+ canvas.drawCircle(c,c,size*0.48f,p)
+ p.color=android.graphics.Color.WHITE
+ canvas.drawCircle(c,c,size*0.28f,p)
+ p.color=0xFF1877F2.toInt()
+ canvas.drawCircle(c,c,size*0.22f,p)
+ return BitmapDrawable(context.resources,bmp)
 }
 /** OpenStreetMap tiles online with local tile cache; saved pins remain in Room offline. */
 @Composable
@@ -53,6 +82,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
  var follow by remember{mutableStateOf(false)}
  var allowed by remember{mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)}
  val requestLocation=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){results->allowed=results.values.any{it};if(allowed)follow=true}
+ val blueLocation=remember(context){gpsDot(context)}
  val ruby=remember(context){pin(context,0xFF9D1026.toInt())}
  val green=remember(context){pin(context,0xFF168956.toInt())}
  val orange=remember(context){pin(context,0xFFE28A20.toInt())}
@@ -66,6 +96,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
    controller.setZoom(13.5)
    controller.setCenter(GeoPoint(-7.1195,-34.8450))
    setUseDataConnection(true)
+   setTilesScaledToDpi(true)
 
   }
  }
@@ -74,6 +105,8 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   if(allowed){
    if(loc==null){loc=MyLocationNewOverlay(GpsMyLocationProvider(context),map);map.overlays.add(loc)}
    val active=loc
+   active.setPersonIcon((blueLocation.bitmap))
+   active.setDirectionIcon((blueLocation.bitmap))
    active.enableMyLocation()
    if(follow){
     active.enableFollowLocation()
