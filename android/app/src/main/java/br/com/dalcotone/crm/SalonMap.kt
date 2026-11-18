@@ -16,9 +16,10 @@ import org.osmdroid.views.overlay.Marker
 
 /** OpenStreetMap tiles online with local tile cache; saved pins remain in Room offline. */
 @Composable
-fun SalonMap(salons:List<Salon>,onSelect:(Salon)->Unit,modifier:Modifier=Modifier,center:GeoPoint?=null){
+fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:(Salon)->Unit,onProspect:(Prospect)->Unit = {},modifier:Modifier=Modifier,center:GeoPoint?=null){
  val context=androidx.compose.ui.platform.LocalContext.current
  val latestSelect by rememberUpdatedState(onSelect)
+ val latestProspect by rememberUpdatedState(onProspect)
  val map=remember(context){
   Configuration.getInstance().load(context,PreferenceManager.getDefaultSharedPreferences(context))
   Configuration.getInstance().userAgentValue=context.packageName
@@ -40,6 +41,16 @@ fun SalonMap(salons:List<Salon>,onSelect:(Salon)->Unit,modifier:Modifier=Modifie
     snippet=if(s.status=="nao_visitado")"Não visitado" else s.status
     setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM)
     setOnMarkerClickListener{_,_->latestSelect(s);true}
+   }
+   view.overlays.add(marker)
+  }
+  prospects.filter{it.latitude!=null&&it.longitude!=null}.forEach{p->
+   val marker=Marker(view).apply{
+    position=GeoPoint(p.latitude!!,p.longitude!!)
+    title=p.name
+    snippet="Oportunidade • toque para cadastrar"
+    setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM)
+    setOnMarkerClickListener{_,_->latestProspect(p);true}
    }
    view.overlays.add(marker)
   }
