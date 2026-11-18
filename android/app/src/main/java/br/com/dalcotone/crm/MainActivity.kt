@@ -65,6 +65,7 @@ class MainActivity:ComponentActivity(){
   val items by dao.items().collectAsStateWithLifecycle(initialValue=emptyList())
   val scope=rememberCoroutineScope()
   var tab by remember{mutableStateOf("Mapa")}
+  val mapSession=remember{SalonMapSession()}
   var selected by remember{mutableStateOf<Salon?>(null)}
   var phoneEditor by remember{mutableStateOf<Salon?>(null)}
   var phoneDraft by remember{mutableStateOf("")}
@@ -454,7 +455,7 @@ class MainActivity:ComponentActivity(){
        Text("${salons.size} salões salvos  •  ${salons.count{it.status=="cliente"}} clientes",color=Muted,style=MaterialTheme.typography.bodySmall)
       }
       Surface(shape=RoundedCornerShape(24.dp),color=Color(0xFFE8EBED),modifier=Modifier.fillMaxWidth().height(440.dp)){
-       SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxSize())
+       SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxSize(),session=mapSession)
       }
       Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()){
        Button(onClick={scan()},enabled=!searching,modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=8.dp,vertical=13.dp)){
