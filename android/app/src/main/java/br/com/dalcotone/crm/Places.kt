@@ -8,9 +8,33 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
-data class Prospect(val placeId:String,val name:String,val address:String,val latitude:Double?,val longitude:Double?)
+data class Prospect(val placeId:String,val name:String,val address:String,val latitude:Double?,val longitude:Double?,val phone:String?=null,val photoName:String?=null)
 class PlacesRepository {
  private val client=OkHttpClient()
+ suspend fun details(p:Prospect):Prospect = withContext(Dispatchers.IO){
+  if(p.placeId.startsWith("osm:"))return@withContext p
+  val key=BuildConfig.PLACES_API_KEY
+  require(key.isNotBlank()){"Google Places não configurado"}
+  val req=Request.Builder().url("https://places.googleapis.com/v1/places/"+p.placeId)
+   .addHeader("X-Goog-Api-Key",key)
+   .addHeader("X-Goog-FieldMask","id,nationalPhoneNumber,internationalPhoneNumber,photos").build()
+  client.newCall(req).execute().use{response->
+   if(!response.isSuccessful)error("Detalhes indisponíveis: HTTP ${response.code}")
+   val j=JSONObject(response.body?.string()?:"{}")
+   p.copy(phone=j.optString("nationalPhoneNumber").ifBlank{j.optString("internationalPhoneNumber")}.ifBlank{null},
+    photoName=j.optJSONArray("photos")?.optJSONObject(0)?.optString("name"))
+  }
+ }
+ suspend fun photoUrl(photoName:String):String? = withContext(Dispatchers.IO){
+  val key=BuildConfig.PLACES_API_KEY
+  if(key.isBlank())return@withContext null
+  val req=Request.Builder().url("https://places.googleapis.com/v1/$photoName/media?maxWidthPx=500&skipHttpRedirect=true")
+   .addHeader("X-Goog-Api-Key",key).build()
+  client.newCall(req).execute().use{response->
+   if(!response.isSuccessful)return@withContext null
+   JSONObject(response.body?.string()?:"{}").optString("photoUri").ifBlank{null}
+  }
+ }
  suspend fun nearby(latitude:Double,longitude:Double):List<Prospect> = withContext(Dispatchers.IO){
   val key=BuildConfig.PLACES_API_KEY
   require(key.isNotBlank()){"Google Places não configurado"}
