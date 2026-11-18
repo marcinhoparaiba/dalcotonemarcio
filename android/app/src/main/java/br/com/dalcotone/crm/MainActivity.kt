@@ -115,6 +115,7 @@ class MainActivity:ComponentActivity(){
   val money=remember{NumberFormat.getCurrencyInstance(Locale("pt","BR"))}
   val db=remember{CrmDatabase.get(this)}
   var voiceDraft by remember{mutableStateOf<String?>(null)}
+  var voiceSalonId by remember{mutableStateOf<String?>(null)}
   val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
    if(uri!=null)scope.launch{
     try{
@@ -141,6 +142,7 @@ class MainActivity:ComponentActivity(){
    }
   }
   fun speak(){
+   voiceSalonId=selected?.id
    try{
     speechLauncher.launch(Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{
      putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -634,13 +636,20 @@ class MainActivity:ComponentActivity(){
    text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
     Text("Revise o texto antes de registrar. Nenhuma ação será executada automaticamente.",color=Muted)
     OutlinedTextField(value=voiceDraft?:"",onValueChange={voiceDraft=it},modifier=Modifier.fillMaxWidth(),minLines=3)
+    Text("Associar ao salão:",color=Ink,fontWeight=FontWeight.Bold)
+    if(salons.isEmpty())Text("Cadastre um salão antes de salvar.",color=Muted)
+    else androidx.compose.foundation.lazy.LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+     items(salons.take(30)){s->
+      FilterChip(selected=voiceSalonId==s.id,onClick={voiceSalonId=s.id},label={Text(s.name,maxLines=1)})
+     }
+    }
    }},
    confirmButton={Button(onClick={
     val draft=voiceDraft.orEmpty().trim()
     if(draft.isNotBlank()){
-     val s=selected
-     if(s!=null)scope.launch{dao.saveSalon(s.copy(notes=(s.notes+"\n"+draft).trim()));message="Anotação salva na ficha."}
-     else message="Anotação reconhecida. Abra uma ficha para associar o registro a um salão."
+     val s=salons.find{it.id==voiceSalonId}
+     if(s!=null)scope.launch{dao.saveSalon(s.copy(notes=(s.notes+"\n"+draft).trim()));message="Anotação salva na ficha de ${s.name}."}
+     else message="Selecione um salão para salvar a anotação."
     }
     voiceDraft=null
    }){Text("Confirmar anotação")}},
