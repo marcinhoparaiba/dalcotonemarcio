@@ -66,6 +66,8 @@ class MainActivity:ComponentActivity(){
   val scope=rememberCoroutineScope()
   var tab by remember{mutableStateOf("Mapa")}
   var selected by remember{mutableStateOf<Salon?>(null)}
+  var phoneEditor by remember{mutableStateOf<Salon?>(null)}
+  var phoneDraft by remember{mutableStateOf("")}
   var add by remember{mutableStateOf(false)}
   var quickCapture by remember{mutableStateOf(false)}
   var capturedLatitude by remember{mutableStateOf<Double?>(null)}
@@ -113,6 +115,14 @@ class MainActivity:ComponentActivity(){
    val international=when{digits.length==10||digits.length==11->"55"+digits;digits.length in 12..13&&digits.startsWith("55")->digits;else->""}
    if(international.isBlank()){message="Número inválido para WhatsApp. Confira o DDD.";return}
    startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+international)))
+  }
+  fun openSalonWhatsapp(s:Salon){
+   if(s.phone.filter{it.isDigit()}.length<10){
+    phoneDraft=s.phone
+    phoneEditor=s
+    return
+   }
+   whatsapp(s.phone)
   }
   fun routeOrder(stops:List<Salon>):List<Salon>{
    val remaining=stops.filter{it.latitude!=null&&it.longitude!=null}.toMutableList()
@@ -230,6 +240,7 @@ class MainActivity:ComponentActivity(){
      else listOf(Color(0xFF0B0B11),Color(0xFF18111A),Color(0xFF230B14))
     )
    ))
+   androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Ink){
    Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
    Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
@@ -274,9 +285,13 @@ class MainActivity:ComponentActivity(){
      Text(statusLabel(s.status),color=Ruby,fontWeight=FontWeight.SemiBold)
      Text(s.city.ifBlank{"Cidade não informada"},color=Muted)
      if(s.address.isNotBlank())Text(s.address,color=Muted)
+     Text("AÇÕES RÁPIDAS",color=Muted,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
+     Button(onClick={openSalonWhatsapp(s)},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF168956)),shape=RoundedCornerShape(14.dp)){
+      Text(if(s.phone.filter{it.isDigit()}.length>=10)"◉  Conversar pelo WhatsApp" else "＋  Adicionar WhatsApp",color=Color.White)
+     }
      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-      Button(onClick={navigate(s)}){Text("Abrir rota")}
-      if(s.phone.isNotBlank())OutlinedButton(onClick={whatsapp(s.phone)}){Text("Consultar WhatsApp")}
+      OutlinedButton(onClick={navigate(s)},modifier=Modifier.weight(1f)){Text("➤  Abrir rota")}
+      OutlinedButton(onClick={phoneDraft=s.phone;phoneEditor=s},modifier=Modifier.weight(1f)){Text("✎  Telefone")}
      }
     }
     val ownSales=sales.filter{it.salonId==s.id}
@@ -341,10 +356,10 @@ class MainActivity:ComponentActivity(){
           Text(s.name,fontWeight=FontWeight.Bold)
           Text(s.address.ifBlank{"Endereço não informado"},style=MaterialTheme.typography.bodySmall)
           Text(statusLabel(s.status),color=Ruby,style=MaterialTheme.typography.bodySmall)
-          Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-           TextButton(onClick={selected=s}){Text("Ficha")}
-           TextButton(onClick={navigate(s)}){Text("Rota")}
-           if(s.phone.isNotBlank())TextButton(onClick={whatsapp(s.phone)}){Text("WhatsApp")}
+          Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+           Button(onClick={selected=s},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Ficha")}
+           OutlinedButton(onClick={navigate(s)},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Rota")}
+           OutlinedButton(onClick={openSalonWhatsapp(s)},modifier=Modifier.weight(1.4f),contentPadding=PaddingValues(horizontal=4.dp),colors=ButtonDefaults.outlinedButtonColors(contentColor=Color(0xFF50D48B))){Text("WhatsApp")}
           }
          }
         }
@@ -513,6 +528,30 @@ class MainActivity:ComponentActivity(){
    }
   }
   }
+  }
+  if(phoneEditor!=null) AlertDialog(
+   onDismissRequest={phoneEditor=null},
+   title={Text("WhatsApp do salão")},
+   text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+    Text(phoneEditor!!.name,color=Ink,fontWeight=FontWeight.Bold)
+    Text("Informe o DDD e o número. O cadastro não confirma se a linha possui WhatsApp.",color=Muted)
+    OutlinedTextField(value=phoneDraft,onValueChange={phoneDraft=it},label={Text("Telefone com DDD")},singleLine=true,modifier=Modifier.fillMaxWidth(),keyboardOptions=KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Phone))
+   }},
+   confirmButton={Button(onClick={
+    val s=phoneEditor!!
+    val digits=phoneDraft.filter{it.isDigit()}
+    if(digits.length !in 10..11 && !(digits.length in 12..13 && digits.startsWith("55"))){
+     message="Informe um telefone válido com DDD."
+    }else{
+     val updated=s.copy(phone=phoneDraft.trim())
+     selected=if(selected?.id==s.id)updated else selected
+     scope.launch{dao.saveSalon(updated)}
+     phoneEditor=null
+     whatsapp(updated.phone)
+    }
+   }){Text("Salvar e abrir WhatsApp")}},
+   dismissButton={TextButton(onClick={phoneEditor=null}){Text("Cancelar")}}
+  )
   if(cnpjDialog) AlertDialog(
    onDismissRequest={cnpjDialog=false},
    title={Text("Consultar empresa pelo CNPJ")},
