@@ -365,6 +365,7 @@ class MainActivity:ComponentActivity(){
      Text(money.format(outstanding/100.0),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Ruby)
      Text("Saldo a receber",color=Muted)
     }
+    OutlinedButton(onClick={speak()},modifier=Modifier.fillMaxWidth()){Text("🎙 Registrar anotação por voz")}
     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
      Button(onClick={editOutcome=true},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Visita")}
      OutlinedButton(onClick={schedule=true},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Agendar")}
