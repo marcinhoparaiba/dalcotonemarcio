@@ -337,9 +337,17 @@ class MainActivity:ComponentActivity(){
     try{
      val known=salons.mapNotNull{it.placeId}.toSet()
      val found=places.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
-     val saved=persistDiscovery(found)
+     var phonesFound=0
+     val detailed=found.map{p->
+      try{
+       val detail=places.details(p)
+       if(!detail.phone.isNullOrBlank())phonesFound++
+       detail
+      }catch(_:Exception){p}
+     }
+     val saved=persistDiscovery(detailed)
      prospectList=emptyList()
-     message="${found.size} salões encontrados no Google • $saved novos salvos offline."
+     message="${found.size} salões encontrados no Google • $saved novos salvos • $phonesFound telefones públicos encontrados."
     }catch(e:Exception){message="Não foi possível consultar o Google: "+(e.message?:"erro de conexão")}
     finally{searching=false}
    }
