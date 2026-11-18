@@ -30,6 +30,8 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Compile and test Android
+        env:
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
         working-directory: android
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Upload debug APK
