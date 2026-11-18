@@ -71,6 +71,10 @@ class MainActivity:ComponentActivity(){
   var selected by remember{mutableStateOf<Salon?>(null)}
   var phoneEditor by remember{mutableStateOf<Salon?>(null)}
   var phoneDraft by remember{mutableStateOf("")}
+  var cityRoutes by remember{mutableStateOf(RouteRelationship.list(this))}
+  var messageSalon by remember{mutableStateOf<Salon?>(null)}
+  var messageKind by remember{mutableStateOf("relacionamento")}
+  var messageDraft by remember{mutableStateOf("")}
   var add by remember{mutableStateOf(false)}
   var quickCapture by remember{mutableStateOf(false)}
   var capturedLatitude by remember{mutableStateOf<Double?>(null)}
@@ -189,6 +193,29 @@ class MainActivity:ComponentActivity(){
    }catch(e:SecurityException){
     message="O Android bloqueou a abertura da conversa."
    }
+  }
+  fun openMessage(s:Salon,kind:String="relacionamento"){
+   messageSalon=s
+   messageKind=kind
+   val route=cityRoutes.find{it.city.equals(s.city,ignoreCase=true)}
+   val balance=sales.filter{it.salonId==s.id}.sumOf{it.totalCents-payments.filter{p->p.saleId==it.id}.sumOf{p->p.amountCents}}
+   messageDraft=RouteRelationship.message(s.name,kind,route,balance)
+  }
+  fun sendPreparedMessage(){
+   val s=messageSalon?:return
+   val digits=s.phone.filter{it.isDigit()}
+   val international=when{
+    digits.length in 12..13 && digits.startsWith("55")->digits
+    digits.length in 10..11->"55"+digits
+    else->""
+   }
+   if(international.isBlank()){message="Cadastre um telefone com DDD na ficha antes de enviar.";return}
+   val uri=Uri.parse("https://wa.me/$international?text="+Uri.encode(messageDraft))
+   try{
+    startActivity(Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE))
+    messageSalon=null
+    message="Mensagem preparada no WhatsApp. Confirme o envio na ficha depois."
+   }catch(e:Exception){message="Não foi possível abrir o WhatsApp: ${e.message}"}
   }
   fun openSalonWhatsapp(s:Salon){
    val digits=s.phone.filter{it.isDigit()}
@@ -372,6 +399,9 @@ class MainActivity:ComponentActivity(){
       },color=if(contactDue(s))Ruby else Muted,fontWeight=FontWeight.Bold
      )
      if(isAttendedClient(s))Text("Próximo contato: "+(s.lastContactAt?.let{java.text.DateFormat.getDateInstance().format(java.util.Date(it+contactWindow))}?:"hoje"),color=Muted)
+     if(isAttendedClient(s) && !s.doNotContact)OutlinedButton(onClick={openMessage(s)},modifier=Modifier.fillMaxWidth()){
+      Text("♡ Preparar mensagem de relacionamento")
+     }
      if(isAttendedClient(s) && !s.doNotContact)OutlinedButton(onClick={confirmContact(s)},modifier=Modifier.fillMaxWidth()){
       Text("✓ Confirmar que enviei a mensagem")
      }
@@ -603,6 +633,40 @@ class MainActivity:ComponentActivity(){
      Text("Próximos compromissos",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("${appointments.count{!it.completed}} agendamentos registrados",color=Muted)
      PremiumCard{
+      Text("ROTAS POR CIDADE",color=Ruby,fontWeight=FontWeight.Bold)
+      Text("Cadastre a próxima passagem. O recolhimento é organizado para o dia combinado da rota.",color=Muted)
+      val cities=salons.map{it.city.trim()}.filter{it.isNotBlank()}.distinct().sorted()
+      if(cities.isEmpty())Text("Cadastre a cidade dos salões para organizar suas rotas.",color=Muted)
+      cities.forEach{city->
+       val route=cityRoutes.find{it.city.equals(city,ignoreCase=true)}
+       Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+        Column(Modifier.weight(1f)){
+         Text(city,color=Ink,fontWeight=FontWeight.Bold)
+         Text(route?.let{RouteRelationship.date(it.dateMillis)}?:"Próxima rota não definida",color=Muted)
+        }
+        TextButton(onClick={
+         val cal=java.util.Calendar.getInstance()
+         android.app.DatePickerDialog(this@MainActivity,{_,year,month,day->
+          val chosen=java.util.Calendar.getInstance().apply{set(year,month,day,12,0,0);set(java.util.Calendar.MILLISECOND,0)}
+          RouteRelationship.save(this@MainActivity,CityRoute(city,chosen.timeInMillis))
+          cityRoutes=RouteRelationship.list(this@MainActivity)
+         },cal.get(java.util.Calendar.YEAR),cal.get(java.util.Calendar.MONTH),cal.get(java.util.Calendar.DAY_OF_MONTH)).show()
+        }){Text(if(route==null)"Definir dia" else "Alterar")}
+       }
+       if(route!=null){
+        salons.filter{it.city.equals(city,ignoreCase=true) && isAttendedClient(it) && !it.doNotContact}.take(12).forEach{s->
+         Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+          Text(s.name,Modifier.weight(1f),maxLines=1,color=Ink)
+          TextButton(onClick={openMessage(s,"rota")}){Text("Avisar rota")}
+          if(sales.any{it.salonId==s.id && it.totalCents>payments.filter{p->p.saleId==it.id}.sumOf{p->p.amountCents}}){
+           TextButton(onClick={openMessage(s,"pagamento")}){Text("Acerto")}
+          }
+         }
+        }
+       }
+      }
+     }
+     PremiumCard{
       Text("CLIENTES ATENDIDOS • CONTATO A CADA 7 DIAS",color=Ruby,fontWeight=FontWeight.Bold)
       Text("${salons.count{contactDue(it)}} salões precisam de contato agora",color=Muted)
       val pending=salons.filter{contactDue(it)}
@@ -611,7 +675,7 @@ class MainActivity:ComponentActivity(){
       pending.forEach{s->
        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
         Text(s.name,Modifier.weight(1f),color=Ink,maxLines=1)
-        TextButton(onClick={openSalonWhatsapp(s)}){Text("WhatsApp")}
+        TextButton(onClick={openMessage(s)}){Text("Mensagem")}
         TextButton(onClick={selected=s}){Text("Ficha")}
        }
       }
@@ -656,6 +720,26 @@ class MainActivity:ComponentActivity(){
   }
   }
   }
+  if(messageSalon!=null) AlertDialog(
+   onDismissRequest={messageSalon=null},
+   title={Text("Mensagem Dal Cotone")},
+   text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+    Text(messageSalon!!.name,color=Ink,fontWeight=FontWeight.Bold)
+    Text("Revise e personalize. O envio é manual e não confirma contato automaticamente.",color=Muted)
+    Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+     listOf("relacionamento" to "Carinho","reposicao" to "Reposição","rota" to "Rota","pagamento" to "Acerto").forEach{(kind,label)->
+      FilterChip(selected=messageKind==kind,onClick={
+       messageKind=kind
+       val s=messageSalon!!
+       messageDraft=RouteRelationship.message(s.name,kind,cityRoutes.find{it.city.equals(s.city,ignoreCase=true)})
+      },label={Text(label)})
+     }
+    }
+    OutlinedTextField(value=messageDraft,onValueChange={messageDraft=it},modifier=Modifier.fillMaxWidth(),minLines=4)
+   }},
+   confirmButton={Button(onClick={sendPreparedMessage()}){Text("Abrir no WhatsApp")}},
+   dismissButton={TextButton(onClick={messageSalon=null}){Text("Cancelar")}}
+  )
   if(voiceDraft!=null) AlertDialog(
    onDismissRequest={voiceDraft=null},
    title={Text("Anotação por voz")},
