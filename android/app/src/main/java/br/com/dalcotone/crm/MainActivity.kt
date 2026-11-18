@@ -224,12 +224,12 @@ class MainActivity:ComponentActivity(){
    }
   }
   Box(Modifier.fillMaxSize()){
-   androidx.compose.foundation.Image(
-    painter=androidx.compose.ui.res.painterResource(if(tab=="Rota"||tab=="Mapa")R.drawable.dalcotone_route_bg else R.drawable.dalcotone_luxe_bg),
-    contentDescription=null,
-    contentScale=androidx.compose.ui.layout.ContentScale.FillBounds,
-    modifier=Modifier.fillMaxSize()
-   )
+   Box(Modifier.fillMaxSize().background(
+    androidx.compose.ui.graphics.Brush.verticalGradient(
+     if(tab=="Rota"||tab=="Mapa") listOf(Color(0xFF0A0A11),Color(0xFF1D101A),Color(0xFF290B15))
+     else listOf(Color(0xFF0B0B11),Color(0xFF18111A),Color(0xFF230B14))
+    )
+   ))
    Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
    Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
