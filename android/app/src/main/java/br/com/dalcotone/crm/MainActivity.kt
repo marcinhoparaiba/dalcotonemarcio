@@ -97,6 +97,10 @@ class MainActivity:ComponentActivity(){
       items.filter{it.saleId==sale.id}.forEach{Text("${it.quantity}x ${it.product}")}
       val due=sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents}
       Text("Falta: ${money.format(due/100.0)}")
+      payments.filter{it.saleId==sale.id}.sortedByDescending{it.paidAt}.forEach{payment->
+       val method=when(payment.method){"pix"->"Pix";"dinheiro"->"Dinheiro";"cartao"->"Cartão";"transferencia"->"Transferência";else->payment.method}
+       Text("Recebido: ${money.format(payment.amountCents/100.0)} • $method • ${java.text.DateFormat.getDateInstance().format(java.util.Date(payment.paidAt))}",style=MaterialTheme.typography.bodySmall,color=Color(0xFF16885D))
+      }
       if(due>0)TextButton(onClick={paymentSale=sale}){Text("Registrar pagamento")}
      }}
     }}
