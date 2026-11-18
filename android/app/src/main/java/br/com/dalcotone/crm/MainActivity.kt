@@ -106,6 +106,22 @@ class MainActivity:ComponentActivity(){
     }
    }catch(e:SecurityException){message="Permissão de localização necessária."}
   }
+  fun cityFromAddress(address:String):String {
+   val match=Regex("""(?:^|,\\s*)([^,]+?)\\s*-\\s*[A-Z]{2}(?:,|\\s*-\\s*Brasil|$)""").findAll(address).lastOrNull()
+   return match?.groupValues?.get(1)?.trim()?.substringAfterLast(",")?.trim().orEmpty()
+  }
+  suspend fun persistDiscovery(found:List<Prospect>):Int {
+   var saved=0
+   found.distinctBy{it.placeId}.forEach{p->
+    if(p.placeId.isNotBlank()){
+     val s=Salon(name=p.name,address=p.address,city=cityFromAddress(p.address),
+      placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,phone=p.phone?:"",
+      status="nao_visitado")
+     if(dao.saveDiscoveredSalon(s)!=-1L)saved++
+    }
+   }
+   return saved
+  }
   fun scan(){
    if(searching)return
    if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
@@ -120,8 +136,9 @@ class MainActivity:ComponentActivity(){
     try{
      val known=salons.mapNotNull{it.placeId}.toSet()
      val found=places.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
-     prospectList=(prospectList+found).distinctBy{it.placeId}
-     message="${found.size} oportunidades encontradas no Google."
+     val saved=persistDiscovery(found)
+     prospectList=emptyList()
+     message="${found.size} salões encontrados no Google • $saved novos salvos offline."
     }catch(e:Exception){message="Não foi possível consultar o Google: "+(e.message?:"erro de conexão")}
     finally{searching=false}
    }
@@ -141,8 +158,9 @@ class MainActivity:ComponentActivity(){
      val known=salons.mapNotNull{it.placeId}.toSet()
      val existing=prospectList.associateBy{it.placeId}
      val found=osm.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
-     prospectList=(existing.values+found).distinctBy{it.placeId}
-     message="${found.size} salões encontrados no OpenStreetMap. Fonte comunitária; pode estar incompleta."
+     val saved=persistDiscovery(found)
+     prospectList=emptyList()
+     message="${found.size} salões encontrados no OpenStreetMap • $saved novos salvos offline."
     }catch(e:Exception){message=e.message?:"Busca OpenStreetMap indisponível"}
     finally{searching=false}
    }
@@ -240,7 +258,7 @@ class MainActivity:ComponentActivity(){
       OutlinedButton(onClick={searchOsm()},enabled=!searching,modifier=Modifier.fillMaxWidth()){Text(if(searching)"Pesquisando..." else "Buscar no OpenStreetMap (online)")}
       TextButton(onClick={cnpjDialog=true}){Text("Consultar CNPJ de um salão (online)")}
       Text("Fontes: Google Places e OpenStreetMap para descoberta; Receita/CNPJ para consulta pontual; CRM SQLite para visitas e clientes.",style=MaterialTheme.typography.bodySmall)
-      Text("Oportunidades encontradas: ${prospectList.size} • salve para acompanhar como Não visitado",style=MaterialTheme.typography.bodySmall)
+      Text("Salões salvos no celular: ${salons.size} • os marcadores permanecem no mapa após fechar o app.",style=MaterialTheme.typography.bodySmall)
       prospectList.take(20).forEach{p->
        Card(onClick={chosenProspect=p;prospectPhotoUrl=null},shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFF9F9FA)),elevation=CardDefaults.cardElevation(defaultElevation=2.dp),modifier=Modifier.fillMaxWidth().padding(vertical=5.dp)){
         Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
