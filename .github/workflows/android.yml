@@ -29,11 +29,27 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Guard against startup drawable crash
+        shell: bash
+        run: |
+          if grep -R -nE 'painterResource\\([^)]*dalcotone_(luxe|route)_bg' android/app/src/main/java; then
+            echo "::error::Layer-list drawables cannot be loaded with Compose painterResource."
+            exit 1
+          fi
+          if grep -R -n 'painterResource' android/app/src/main/java/br/com/dalcotone/crm/MainActivity.kt; then
+            echo "::warning::Review painterResource usages for unsupported XML drawable types."
+          fi
+          echo "Startup drawable crash guard passed on commit $GITHUB_SHA"
       - name: Compile and test Android
         env:
           GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
         working-directory: android
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      - name: Identify APK build
+        shell: bash
+        run: |
+          echo "APK compiled from commit $GITHUB_SHA"
+          sha256sum android/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
