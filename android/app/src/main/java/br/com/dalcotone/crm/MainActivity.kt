@@ -56,6 +56,7 @@ class MainActivity:ComponentActivity(){
   var product by remember{mutableStateOf("")};var qty by remember{mutableStateOf("1")};var price by remember{mutableStateOf("")}
   var paymentSale by remember{mutableStateOf<Sale?>(null)}
   var amount by remember{mutableStateOf("")}
+  var paymentMethod by remember{mutableStateOf("pix")}
   var prospectList by remember{mutableStateOf<List<Prospect>>(emptyList())}
   val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
@@ -124,6 +125,39 @@ class MainActivity:ComponentActivity(){
   if(editOutcome&&selected!=null)AlertDialog(onDismissRequest={editOutcome=false},title={Text("Registrar atendimento")},text={Column{listOf("cliente","retorno","recusou","inativo").forEach{f->Row{RadioButton(selected=outcome==f,onClick={outcome=f});Text(f)}};OutlinedTextField(notes,{notes=it},label={Text("Observações")})}},confirmButton={TextButton(onClick={val s=selected!!;scope.launch{dao.addVisit(Visit(salonId=s.id,outcome=outcome,notes=notes));val updated=s.copy(status=outcome,lastContactAt=System.currentTimeMillis(),notes=notes,doNotContact=outcome=="recusou");dao.saveSalon(updated);selected=updated};editOutcome=false}){Text("Registrar")}})
   if(schedule&&selected!=null)AlertDialog(onDismissRequest={schedule=false},title={Text("Agendar retorno")},text={Column{Text("Data e hora: AAAA-MM-DD HH:MM");OutlinedTextField(dateTime,{dateTime=it});Text("Lembrete 30 minutos antes, offline")}},confirmButton={TextButton(onClick={try{val formatter=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");val at=java.time.LocalDateTime.parse(dateTime,formatter).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();val s=selected!!;val a=Appointment(salonId=s.id,startsAt=at);scope.launch{dao.addAppointment(a)};val exact=Reminders.schedule(this,a,s.name);message=if(exact)"Agendado com alarme exato." else "Agendado; alerta pode atrasar conforme Android.";if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS));schedule=false}catch(e:Exception){message="Data inválida: use AAAA-MM-DD HH:MM"}}){Text("Salvar")}})
   if(sell&&selected!=null)AlertDialog(onDismissRequest={sell=false},title={Text("Nova venda")},text={Column{OutlinedTextField(product,{product=it},label={Text("Produto")});OutlinedTextField(qty,{qty=it},label={Text("Quantidade")});OutlinedTextField(price,{price=it},label={Text("Preço unitário (R$)")})}},confirmButton={TextButton(onClick={val q=qty.toIntOrNull();val cents=(price.replace(",",".").toBigDecimalOrNull()?.multiply(java.math.BigDecimal(100)))?.toLong();if(q!=null&&q>0&&cents!=null&&cents>0&&product.isNotBlank()){val sale=Sale(salonId=selected!!.id,dueAt=null,totalCents=q*cents);scope.launch{dao.addSale(sale);dao.addItem(SaleItem(saleId=sale.id,product=product,quantity=q,unitPriceCents=cents))};sell=false;product="";price=""}else message="Confira os valores."}){Text("Salvar")}})
-  if(paymentSale!=null)AlertDialog(onDismissRequest={paymentSale=null},title={Text("Pagamento parcial")},text={OutlinedTextField(amount,{amount=it},label={Text("Valor recebido (R$) ")})},confirmButton={TextButton(onClick={val cents=amount.replace(",",".").toBigDecimalOrNull()?.multiply(java.math.BigDecimal(100))?.toLong();val sale=paymentSale!!;if(cents!=null){scope.launch{try{dao.pay(sale.id,cents,"pix");message="Pagamento registrado"}catch(e:Exception){message=e.message?:"Erro"}};paymentSale=null;amount=""}}){Text("Registrar Pix")}})
+  if(paymentSale!=null)AlertDialog(
+   onDismissRequest={paymentSale=null},
+   title={Text("Registrar pagamento parcial")},
+   text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    val sale=paymentSale!!
+    val alreadyPaid=payments.filter{it.saleId==sale.id}.sumOf{it.amountCents}
+    Text("Saldo atual: ${money.format((sale.totalCents-alreadyPaid)/100.0)}",fontWeight=FontWeight.Bold,color=Ruby)
+    OutlinedTextField(amount,{amount=it},label={Text("Valor recebido (R$)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    Text("Método de pagamento",fontWeight=FontWeight.Medium)
+    listOf("pix" to "Pix","dinheiro" to "Dinheiro","cartao" to "Cartão","transferencia" to "Transferência").forEach{(value,label)->
+     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+      RadioButton(selected=paymentMethod==value,onClick={paymentMethod=value})
+      Text(label,modifier=Modifier.clickable{paymentMethod=value})
+     }
+    }
+    val cents=amount.replace(",",".").toBigDecimalOrNull()?.multiply(java.math.BigDecimal(100))?.toLong()
+    if(cents!=null&&cents>0)Text("Saldo após pagamento: ${money.format((sale.totalCents-alreadyPaid-cents)/100.0)}")
+   }},
+   confirmButton={TextButton(onClick={
+    val cents=amount.replace(",",".").toBigDecimalOrNull()?.multiply(java.math.BigDecimal(100))?.toLong()
+    val sale=paymentSale!!
+    val balance=sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents}
+    if(cents==null||cents<=0||cents>balance){message="Informe um valor maior que zero e até o saldo devedor."}
+    else{
+     val method=paymentMethod
+     scope.launch{
+      try{dao.pay(sale.id,cents,method);message="Pagamento salvo. Saldo atualizado automaticamente."}
+      catch(e:Exception){message=e.message?:"Erro ao registrar pagamento"}
+     }
+     paymentSale=null;amount="";paymentMethod="pix"
+    }
+   }){Text("Confirmar pagamento")}},
+   dismissButton={TextButton(onClick={paymentSale=null}){Text("Cancelar")}}
+  )
  }
 }
