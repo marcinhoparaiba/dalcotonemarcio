@@ -301,7 +301,7 @@ class MainActivity:ComponentActivity(){
     }}
    }else when(tab){
     "Cidades"->{
-     Text("Salões por cidade",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("Explore por cidade",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("Organize a prospecção por território e acompanhe os atendimentos.",style=MaterialTheme.typography.bodySmall,color=Muted)
      if(salons.isEmpty())EmptyPanel("Nenhum salão cadastrado","Abra o Radar comercial e busque salões próximos para começar.")
      if(selectedCity==null){
@@ -346,8 +346,8 @@ class MainActivity:ComponentActivity(){
      }
     }
     "Rota"->{
-     Text("Criar roteiro",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     Text("Rotas de clientes, prospecção ou mistas.",style=MaterialTheme.typography.bodySmall)
+     Text("Seu próximo roteiro",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+     Text("Planeje uma sequência de visitas sem deslocamentos desnecessários.",style=MaterialTheme.typography.bodyMedium,color=Muted)
      Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
       listOf("clientes" to "Clientes","prospectos" to "Prospectos","ambos" to "Mista").forEach{(value,label)->
        FilterChip(selected=routeAudience==value,onClick={routeAudience=value;routeSelectedIds=emptySet()},label={Text(label)})
@@ -405,22 +405,37 @@ class MainActivity:ComponentActivity(){
     }
     "Mapa","Clientes"->{
      if(tab=="Mapa"){
-      Surface(color=Color(0xFFF9F2F3),shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
-       Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-        Text("RADAR DE OPORTUNIDADES",color=Ruby,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium)
-        Text("${prospectList.size} salões para prospectar",fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
-        Text("Explore o mapa, abra um salão e entre em contato.",style=MaterialTheme.typography.bodySmall)
+      PremiumCard{
+       Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+        Column{
+         Text("RADAR AO VIVO",color=Ruby,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
+         Text("Explore seu território",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+        }
+        Surface(color=Color(0xFFF7E8EB),shape=RoundedCornerShape(14.dp)){
+         Text("${prospectList.size} novos",Modifier.padding(horizontal=12.dp,vertical=8.dp),color=Ruby,fontWeight=FontWeight.Bold)
+        }
+       }
+       Text("${salons.size} salões salvos  •  ${salons.count{it.status=="cliente"}} clientes",color=Muted,style=MaterialTheme.typography.bodySmall)
+      }
+      Surface(shape=RoundedCornerShape(24.dp),color=Color(0xFFE8EBED),modifier=Modifier.fillMaxWidth().height(440.dp)){
+       SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxSize())
+      }
+      Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()){
+       Button(onClick={scan()},enabled=!searching,modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=8.dp,vertical=13.dp)){
+        Text(if(searching)"Buscando..." else "Buscar salões")
+       }
+       OutlinedButton(onClick={captureHere()},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=8.dp,vertical=13.dp)){
+        Text("Salvar pelo GPS")
        }
       }
-      SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxWidth().height(340.dp))
-      Text("Mapa OpenStreetMap: ruas precisam de internet na primeira visualização; pontos cadastrados ficam salvos offline.",style=MaterialTheme.typography.bodySmall)
-      Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
-      Button(onClick={captureHere()},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
-      OutlinedButton(onClick={scan()},enabled=!searching,modifier=Modifier.fillMaxWidth()){Text(if(searching)"Aguarde a pesquisa..." else "Buscar no Google Places (online)")}
-      OutlinedButton(onClick={searchOsm()},enabled=!searching,modifier=Modifier.fillMaxWidth()){Text(if(searching)"Pesquisando..." else "Buscar no OpenStreetMap (online)")}
-      TextButton(onClick={cnpjDialog=true}){Text("Consultar CNPJ de um salão (online)")}
-      Text("Fontes: Google Places e OpenStreetMap para descoberta; Receita/CNPJ para consulta pontual; CRM SQLite para visitas e clientes.",style=MaterialTheme.typography.bodySmall)
-      Text("Salões salvos no celular: ${salons.size} • os marcadores permanecem no mapa após fechar o app.",style=MaterialTheme.typography.bodySmall)
+      Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()){
+       OutlinedButton(onClick={searchOsm()},enabled=!searching,modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=8.dp)){
+        Text("Busca alternativa")
+       }
+       TextButton(onClick={cnpjDialog=true},modifier=Modifier.weight(1f)){Text("Consultar CNPJ")}
+      }
+      Text("Mapa: OpenStreetMap  •  Salões salvos disponíveis offline",color=Muted,style=MaterialTheme.typography.labelSmall)
+      if(prospectList.isNotEmpty())Text("Oportunidades encontradas",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
       prospectList.take(20).forEach{p->
        Card(onClick={chosenProspect=p;prospectPhotoUrl=null},shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFF9F9FA)),elevation=CardDefaults.cardElevation(defaultElevation=2.dp),modifier=Modifier.fillMaxWidth().padding(vertical=5.dp)){
         Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
@@ -458,7 +473,7 @@ class MainActivity:ComponentActivity(){
      }}
     }
     "Agenda"->{
-     Text("Próximos compromissos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("Próximos compromissos",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("${appointments.count{!it.completed}} agendamentos registrados",color=Muted)
      if(appointments.isEmpty())EmptyPanel("Sua agenda está livre","Abra a ficha de um salão e toque em Agendar para criar uma visita ou retorno.")
      LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(appointments){a->
