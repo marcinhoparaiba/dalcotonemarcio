@@ -36,9 +36,25 @@ import java.text.NumberFormat
 import java.util.Locale
 
 private val Ruby=Color(0xFF9B111E)
+private val Ink=Color(0xFF22232A)
+private val Muted=Color(0xFF6D707B)
+private val CanvasBg=Color(0xFFF7F7FA)
+private val CardBg=Color.White
+private fun statusLabel(status:String)=when(status){"nao_visitado"->"Não visitado";"cliente"->"Cliente";"retorno"->"Retorno pendente";"recusou"->"Não interessado";"inativo"->"Inativo";else->status.replace('_',' ')}
+@Composable private fun PremiumCard(modifier:Modifier=Modifier,content:@Composable ColumnScope.()->Unit){
+ Card(modifier=modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),
+  colors=CardDefaults.cardColors(containerColor=CardBg),elevation=CardDefaults.cardElevation(defaultElevation=2.dp)){
+  Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp),content=content)
+ }
+}
+@Composable private fun EmptyPanel(title:String,subtitle:String){
+ PremiumCard{Text(title,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold,color=Ink)
+ Text(subtitle,color=Muted,style=MaterialTheme.typography.bodyMedium)}
+}
+
 class MainActivity:ComponentActivity(){
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);Reminders.channel(this)
-  setContent { MaterialTheme(colorScheme=lightColorScheme(primary=Ruby,background=Color.White,surface=Color.White)) { CRMApp() } }
+  setContent { MaterialTheme(colorScheme=lightColorScheme(primary=Ruby,onPrimary=Color.White,background=CanvasBg,surface=CardBg,onSurface=Ink,secondary=Ink,surfaceVariant=Color(0xFFF0EDF0))) { CRMApp() } }
  }
  @Composable private fun CRMApp(){
   val dao=remember{CrmDatabase.get(this).dao()}
@@ -207,24 +223,43 @@ class MainActivity:ComponentActivity(){
     finally{searching=false}
    }
   }
-  Column(Modifier.fillMaxSize().background(Color.White).padding(16.dp)){
-   Text("DAL COTONE",color=Ruby,fontWeight=FontWeight.Bold)
-   Text("CRM Comercial",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-   Spacer(Modifier.height(12.dp))
+  Column(Modifier.fillMaxSize().background(CanvasBg).padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   Surface(shape=RoundedCornerShape(22.dp),color=Ink,modifier=Modifier.fillMaxWidth()){
+    Column(Modifier.padding(horizontal=20.dp,vertical=17.dp),verticalArrangement=Arrangement.spacedBy(2.dp)){
+     Text("DAL COTONE  /  COMERCIAL",color=Color(0xFFFFA9B1),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
+     Text(when(tab){"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+     Text("${salons.size} salões na carteira  •  ${salons.count{it.status=="cliente"}} clientes",color=Color(0xFFD6D3D9),style=MaterialTheme.typography.bodySmall)
+    }
+   }
    LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){items(listOf("Mapa","Cidades","Clientes","Rota","Agenda","Financeiro")){t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
-   if(message.isNotBlank())Text(message,color=Ruby,style=MaterialTheme.typography.bodySmall)
+   if(message.isNotBlank())Surface(color=Color(0xFFF5E9EC),shape=RoundedCornerShape(12.dp)){Text(message,Modifier.fillMaxWidth().padding(10.dp),color=Ruby,style=MaterialTheme.typography.bodySmall)}
    if(selected!=null){
     val s=selected!!
     TextButton(onClick={selected=null}){Text("← Voltar")}
-    Text(s.name,style=MaterialTheme.typography.titleLarge)
-    Text("${s.city} • ${s.status}")
-    Text(s.address)
-    Row{TextButton(onClick={navigate(s)}){Text("Abrir rota")};TextButton(onClick={if(s.phone.isNotBlank())whatsapp(s.phone)}){Text("Consultar WhatsApp")}}
+    PremiumCard{
+     Text(s.name,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=Ink)
+     Text(statusLabel(s.status),color=Ruby,fontWeight=FontWeight.SemiBold)
+     Text(s.city.ifBlank{"Cidade não informada"},color=Muted)
+     if(s.address.isNotBlank())Text(s.address,color=Muted)
+     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+      Button(onClick={navigate(s)}){Text("Abrir rota")}
+      if(s.phone.isNotBlank())OutlinedButton(onClick={whatsapp(s.phone)}){Text("Consultar WhatsApp")}
+     }
+    }
     val ownSales=sales.filter{it.salonId==s.id}
     val outstanding=ownSales.sumOf{sale->sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents}}
-    Text("Saldo a receber: ${money.format(outstanding/100.0)}",fontWeight=FontWeight.Bold,color=Ruby)
-    Row{TextButton(onClick={editOutcome=true}){Text("Registrar visita")};TextButton(onClick={schedule=true}){Text("Agendar")};TextButton(onClick={sell=true}){Text("Nova venda")}}
-    Text("Últimas compras",fontWeight=FontWeight.Bold)
+    PremiumCard{
+     Text("FINANCEIRO DO SALÃO",style=MaterialTheme.typography.labelMedium,color=Muted)
+     Text(money.format(outstanding/100.0),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Ruby)
+     Text("Saldo a receber",color=Muted)
+    }
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+     Button(onClick={editOutcome=true},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Visita")}
+     OutlinedButton(onClick={schedule=true},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Agendar")}
+     OutlinedButton(onClick={sell=true},modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp)){Text("Venda")}
+    }
+    Text("Histórico de compras",fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+    if(ownSales.isEmpty())EmptyPanel("Nenhuma compra registrada","A primeira venda transforma este salão em cliente automaticamente.")
     LazyColumn{items(ownSales){sale->
      Card(Modifier.fillMaxWidth().padding(vertical=5.dp)){Column(Modifier.padding(12.dp)){
       Text("Venda: ${money.format(sale.totalCents/100.0)}")
@@ -240,13 +275,14 @@ class MainActivity:ComponentActivity(){
     }}
    }else when(tab){
     "Cidades"->{
-     Text("Salões salvos por cidade",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     Text("Sua carteira comercial separada das rotas e das oportunidades ainda não salvas.",style=MaterialTheme.typography.bodySmall)
+     Text("Salões por cidade",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("Organize a prospecção por território e acompanhe os atendimentos.",style=MaterialTheme.typography.bodySmall,color=Muted)
+     if(salons.isEmpty())EmptyPanel("Nenhum salão cadastrado","Abra o Radar comercial e busque salões próximos para começar.")
      if(selectedCity==null){
       val groups=salons.groupBy{it.city.trim().ifBlank{"Cidade não informada"}}.toSortedMap()
       LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)){
        items(groups.entries.toList()){entry->
-        Card(onClick={selectedCity=entry.key},shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
+        Card(onClick={selectedCity=entry.key},shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=CardBg),elevation=CardDefaults.cardElevation(defaultElevation=2.dp),modifier=Modifier.fillMaxWidth()){
          Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){
           Column{
            Text(entry.key,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
@@ -267,11 +303,11 @@ class MainActivity:ComponentActivity(){
       }
       LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){
        items(salons.filter{it.city.trim().ifBlank{"Cidade não informada"}==selectedCity&&(cityFilter=="todos"||it.status==cityFilter)}.sortedBy{it.name}){s->
-        Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
+        Card(shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=CardBg),modifier=Modifier.fillMaxWidth()){
          Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
           Text(s.name,fontWeight=FontWeight.Bold)
           Text(s.address.ifBlank{"Endereço não informado"},style=MaterialTheme.typography.bodySmall)
-          Text(if(s.status=="nao_visitado")"Não visitado" else s.status,color=Ruby,style=MaterialTheme.typography.bodySmall)
+          Text(statusLabel(s.status),color=Ruby,style=MaterialTheme.typography.bodySmall)
           Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
            TextButton(onClick={selected=s}){Text("Ficha")}
            TextButton(onClick={navigate(s)}){Text("Rota")}
@@ -284,7 +320,7 @@ class MainActivity:ComponentActivity(){
      }
     }
     "Rota"->{
-     Text("FAZER ROTA",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("Criar roteiro",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
      Text("Rotas de clientes, prospecção ou mistas.",style=MaterialTheme.typography.bodySmall)
      Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
       listOf("clientes" to "Clientes","prospectos" to "Prospectos","ambos" to "Mista").forEach{(value,label)->
@@ -296,7 +332,11 @@ class MainActivity:ComponentActivity(){
       when(routeAudience){"clientes"->customer;"prospectos"->!customer&&s.status=="nao_visitado";else->customer||s.status=="nao_visitado"}
      }
      val geolocated=customers.filter{it.latitude!=null&&it.longitude!=null}
-     Text("${customers.size} clientes • ${geolocated.size} com GPS",color=Ruby,fontWeight=FontWeight.Bold)
+     PremiumCard{
+      Text("ESTABELECIMENTOS DISPONÍVEIS",style=MaterialTheme.typography.labelSmall,color=Muted)
+      Text("${customers.size} salões  •  ${geolocated.size} com GPS",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Ink)
+      if(customers.isEmpty())Text("Nenhum salão nesta categoria. Selecione Prospectos para planejar novas visitas.",color=Muted)
+     }
      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
       FilterChip(selected=routeAll,onClick={routeAll=true},label={Text("ROTA TOTAL")})
       FilterChip(selected=!routeAll,onClick={routeAll=false},label={Text("Selecionar paradas")})
@@ -311,8 +351,8 @@ class MainActivity:ComponentActivity(){
      val inCity=geolocated.filter{routeCity==null||it.city.trim().ifBlank{"Cidade não informada"}==routeCity}
      val chosen=if(routeAll)inCity else inCity.filter{it.id in routeSelectedIds}
      val ordered=routeOrder(chosen)
-     Text("${ordered.size} paradas • ${(ordered.size+7)/8} etapa(s)",style=MaterialTheme.typography.bodyMedium)
-     Text("Sequência preliminar por proximidade geográfica. O tempo real e as ruas são calculados pelo Google Maps após abrir cada etapa.",style=MaterialTheme.typography.bodySmall)
+     Text("${ordered.size} paradas  •  ${(ordered.size+7)/8} etapa(s)",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+     Text("Ordem aproximada por proximidade. O Google Maps calcula o percurso viário de cada etapa.",style=MaterialTheme.typography.bodySmall,color=Muted)
      Button(onClick={openRoute(chosen,0)},enabled=chosen.isNotEmpty(),modifier=Modifier.fillMaxWidth()){
       Text("INICIAR PRIMEIRA ETAPA NO GOOGLE MAPS")
      }
@@ -370,16 +410,57 @@ class MainActivity:ComponentActivity(){
        }
       }
      }
-     OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},modifier=Modifier.fillMaxWidth())
-     Row{listOf("todos","cliente","retorno","nao_visitado").forEach{f->FilterChip(selected=filter==f,onClick={filter=f},label={Text(f)},modifier=Modifier.padding(end=3.dp))}}
+     OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},singleLine=true,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth())
+     LazyRow(horizontalArrangement=Arrangement.spacedBy(5.dp)){items(listOf("todos","cliente","retorno","nao_visitado")){f->FilterChip(selected=filter==f,onClick={filter=f},label={Text(if(f=="todos")"Todos" else statusLabel(f))})}}
      Button(onClick={add=true}){Text("+ Novo salão")}
-     LazyColumn{items(salons.filter{(filter=="todos"||it.status==filter)&&("${it.name} ${it.city}".contains(search,true))}){s->Card(onClick={selected=s},modifier=Modifier.fillMaxWidth().padding(vertical=5.dp)){Column(Modifier.padding(14.dp)){Text(s.name,fontWeight=FontWeight.Bold);Text("${s.city} • ${s.status}",style=MaterialTheme.typography.bodySmall)}}}}
+     val visibleSalons=salons.filter{(filter=="todos"||it.status==filter)&&("${it.name} ${it.city}".contains(search,true))}
+     if(visibleSalons.isEmpty())EmptyPanel("Nenhum salão encontrado","Altere os filtros ou adicione um novo estabelecimento.")
+     LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(visibleSalons){s->
+      Card(onClick={selected=s},shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=CardBg),elevation=CardDefaults.cardElevation(defaultElevation=1.dp),modifier=Modifier.fillMaxWidth()){
+       Row(Modifier.padding(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
+        Surface(shape=RoundedCornerShape(14.dp),color=Color(0xFFF7E8EB),modifier=Modifier.size(48.dp)){
+         Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("✂",color=Ruby,style=MaterialTheme.typography.titleLarge)}
+        }
+        Column(Modifier.weight(1f)){
+         Text(s.name,fontWeight=FontWeight.Bold,color=Ink)
+         Text(statusLabel(s.status),color=Ruby,style=MaterialTheme.typography.bodySmall)
+         Text(s.city.ifBlank{"Cidade não informada"},color=Muted,style=MaterialTheme.typography.bodySmall)
+        }
+        Text("›",color=Ruby,style=MaterialTheme.typography.headlineSmall)
+       }
+      }
+     }}
     }
-    "Agenda"->LazyColumn{items(appointments){a->val s=salons.find{it.id==a.salonId};Card(Modifier.fillMaxWidth().padding(vertical=5.dp)){Column(Modifier.padding(12.dp)){Text(s?.name?:"Salão");Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(a.startsAt)));Text(a.notes)}}}}
+    "Agenda"->{
+     Text("Próximos compromissos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("${appointments.count{!it.completed}} agendamentos registrados",color=Muted)
+     if(appointments.isEmpty())EmptyPanel("Sua agenda está livre","Abra a ficha de um salão e toque em Agendar para criar uma visita ou retorno.")
+     LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(appointments){a->
+      val s=salons.find{it.id==a.salonId}
+      PremiumCard{
+       Text(s?.name?:"Salão",fontWeight=FontWeight.Bold,color=Ink)
+       Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(a.startsAt)),color=Ruby)
+       if(a.notes.isNotBlank())Text(a.notes,color=Muted)
+       if(s!=null)TextButton(onClick={selected=s}){Text("Abrir ficha")}
+      }
+     }}
+    }
     else->{
-     Text("Total a receber",style=MaterialTheme.typography.titleMedium)
-     Text(money.format((sales.sumOf{it.totalCents}-payments.sumOf{it.amountCents})/100.0),color=Ruby,style=MaterialTheme.typography.headlineMedium)
-     LazyColumn{items(sales){sale->val s=salons.find{it.id==sale.salonId};Text("${s?.name}: ${money.format((sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents})/100.0)}")}}
+     Text("Visão financeira",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     PremiumCard{
+      Text("TOTAL A RECEBER",color=Muted,style=MaterialTheme.typography.labelMedium)
+      Text(money.format((sales.sumOf{it.totalCents}-payments.sumOf{it.amountCents})/100.0),color=Ruby,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
+      Text("${sales.size} vendas registradas",color=Muted)
+     }
+     if(sales.isEmpty())EmptyPanel("Nenhuma venda registrada","Registre uma venda na ficha do salão para acompanhar recebimentos.")
+     LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(sales){sale->
+      val s=salons.find{it.id==sale.salonId}
+      PremiumCard{
+       Text(s?.name?:"Salão",fontWeight=FontWeight.Bold)
+       Text("Saldo: ${money.format((sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents})/100.0)}",color=Ruby)
+       if(s!=null)TextButton(onClick={selected=s}){Text("Abrir ficha")}
+      }
+     }}
     }
    }
   }
