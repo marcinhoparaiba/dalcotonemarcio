@@ -35,11 +35,11 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
-private val Ruby=Color(0xFF9B111E)
-private val Ink=Color(0xFF22232A)
-private val Muted=Color(0xFF6D707B)
-private val CanvasBg=Color(0xFFF7F7FA)
-private val CardBg=Color.White
+private val Ruby=Color(0xFFCA1737)
+private val Ink=Color(0xFFF8F5F7)
+private val Muted=Color(0xFFBFB6C1)
+private val CanvasBg=Color(0xFF0B0B11)
+private val CardBg=Color(0xFF201A24)
 private fun statusLabel(status:String)=when(status){"nao_visitado"->"Não visitado";"cliente"->"Cliente";"retorno"->"Retorno pendente";"recusou"->"Não interessado";"inativo"->"Inativo";else->status.replace('_',' ')}
 @Composable private fun PremiumCard(modifier:Modifier=Modifier,content:@Composable ColumnScope.()->Unit){
  Card(modifier=modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),
@@ -54,7 +54,7 @@ private fun statusLabel(status:String)=when(status){"nao_visitado"->"Não visita
 
 class MainActivity:ComponentActivity(){
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);Reminders.channel(this)
-  setContent { MaterialTheme(colorScheme=lightColorScheme(primary=Ruby,onPrimary=Color.White,background=CanvasBg,surface=CardBg,onSurface=Ink,secondary=Ink,surfaceVariant=Color(0xFFF0EDF0))) { CRMApp() } }
+  setContent { MaterialTheme(colorScheme=darkColorScheme(primary=Ruby,onPrimary=Color.White,background=CanvasBg,surface=CardBg,onSurface=Ink,secondary=Ink,surfaceVariant=Color(0xFF302330),outline=Color(0xFF72505A))) { CRMApp() } }
  }
  @Composable private fun CRMApp(){
   val dao=remember{CrmDatabase.get(this).dao()}
@@ -231,18 +231,18 @@ class MainActivity:ComponentActivity(){
     modifier=Modifier.fillMaxSize()
    )
    Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   Surface(shape=RoundedCornerShape(20.dp),color=Ink,modifier=Modifier.fillMaxWidth()){
+   Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
      Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
       Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("DC",color=Color.White,fontWeight=FontWeight.ExtraBold)}
      }
      Column(Modifier.weight(1f)){
-      Text("DAL COTONE",color=Color(0xFFFFB6C0),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
+      Text("DAL COTONE",color=Color(0xFFFFA0B0),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
       Text(when(tab){"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
      }
      Column(horizontalAlignment=androidx.compose.ui.Alignment.End){
       Text("${salons.size}",color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-      Text("salões",color=Color(0xFFD6D3D9),style=MaterialTheme.typography.labelSmall)
+      Text("salões",color=Color(0xFFD6C5CE),style=MaterialTheme.typography.labelSmall)
      }
     }
    }
@@ -251,8 +251,8 @@ class MainActivity:ComponentActivity(){
     items(navigationItems){(target,symbol)->
      val active=tab==target
      Surface(onClick={tab=target;selected=null;message=""},shape=RoundedCornerShape(15.dp),
-      color=if(active)Ruby else Color.White,
-      border=if(active)null else androidx.compose.foundation.BorderStroke(1.dp,Color(0xFFE6E3E8))){
+      color=if(active)Ruby else CardBg,
+      border=if(active)null else androidx.compose.foundation.BorderStroke(1.dp,Color(0xFF6A3845))){
       Row(Modifier.padding(horizontal=14.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
        Text(symbol,color=if(active)Color.White else Ruby,fontWeight=FontWeight.Bold)
        Text(target,color=if(active)Color.White else Ink,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium)
@@ -260,7 +260,7 @@ class MainActivity:ComponentActivity(){
      }
     }
    }
-   if(message.isNotBlank())Surface(color=Color(0xFFF5E9EC),shape=RoundedCornerShape(12.dp)){
+   if(message.isNotBlank())Surface(color=Color(0xFF381C29),shape=RoundedCornerShape(12.dp)){
     Row(Modifier.fillMaxWidth().padding(10.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
      Text(message,Modifier.weight(1f),color=Ruby,style=MaterialTheme.typography.bodySmall)
      TextButton(onClick={message=""},contentPadding=PaddingValues(horizontal=6.dp)){Text("Fechar")}
@@ -418,7 +418,7 @@ class MainActivity:ComponentActivity(){
          Text("RADAR AO VIVO",color=Ruby,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
          Text("Explore seu território",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
         }
-        Surface(color=Color(0xFFF7E8EB),shape=RoundedCornerShape(14.dp)){
+        Surface(color=Color(0xFF381C29),shape=RoundedCornerShape(14.dp)){
          Text("${prospectList.size} novos",Modifier.padding(horizontal=12.dp,vertical=8.dp),color=Ruby,fontWeight=FontWeight.Bold)
         }
        }
