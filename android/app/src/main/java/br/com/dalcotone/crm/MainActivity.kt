@@ -105,15 +105,27 @@ class MainActivity:ComponentActivity(){
    }catch(e:SecurityException){message="Permissão de localização necessária."}
   }
   fun scan(){
+   if(searching)return
    if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
     locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION));message="Autorize a localização e toque novamente.";return
    }
    val provider=when{locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)->android.location.LocationManager.GPS_PROVIDER;locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)->android.location.LocationManager.NETWORK_PROVIDER;else->null}
    val location=provider?.let{locationManager.getLastKnownLocation(it)}
    if(location==null){message="Sem posição recente. Ative o GPS e tente novamente.";return}
-   scope.launch{try{val known=salons.mapNotNull{it.placeId}.toSet();prospectList=places.nearby(location.latitude,location.longitude).filter{it.placeId !in known};message="${prospectList.size} oportunidades encontradas."}catch(e:Exception){message=e.message?:"Busca indisponível"}}
+   scope.launch{
+    searching=true
+    message="Buscando salões próximos no Google..."
+    try{
+     val known=salons.mapNotNull{it.placeId}.toSet()
+     val found=places.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
+     prospectList=(prospectList+found).distinctBy{it.placeId}
+     message="${found.size} oportunidades encontradas no Google."
+    }catch(e:Exception){message="Não foi possível consultar o Google: "+(e.message?:"erro de conexão")}
+    finally{searching=false}
+   }
   }
   fun searchOsm(){
+   if(searching)return
    if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
     locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
     message="Autorize a localização e toque novamente.";return
@@ -178,7 +190,7 @@ class MainActivity:ComponentActivity(){
       Text("Mapa OpenStreetMap: ruas precisam de internet na primeira visualização; pontos cadastrados ficam salvos offline.",style=MaterialTheme.typography.bodySmall)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
       Button(onClick={captureHere()},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
-      OutlinedButton(onClick={scan()},modifier=Modifier.fillMaxWidth()){Text("Buscar no Google Places (online)")}
+      OutlinedButton(onClick={scan()},enabled=!searching,modifier=Modifier.fillMaxWidth()){Text(if(searching)"Aguarde a pesquisa..." else "Buscar no Google Places (online)")}
       OutlinedButton(onClick={searchOsm()},enabled=!searching,modifier=Modifier.fillMaxWidth()){Text(if(searching)"Pesquisando..." else "Buscar no OpenStreetMap (online)")}
       TextButton(onClick={cnpjDialog=true}){Text("Consultar CNPJ de um salão (online)")}
       Text("Fontes: Google Places e OpenStreetMap para descoberta; Receita/CNPJ para consulta pontual; CRM SQLite para visitas e clientes.",style=MaterialTheme.typography.bodySmall)
