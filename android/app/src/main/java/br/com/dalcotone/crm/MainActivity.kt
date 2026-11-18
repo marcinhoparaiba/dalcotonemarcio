@@ -224,15 +224,41 @@ class MainActivity:ComponentActivity(){
    }
   }
   Column(Modifier.fillMaxSize().background(CanvasBg).padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   Surface(shape=RoundedCornerShape(22.dp),color=Ink,modifier=Modifier.fillMaxWidth()){
-    Column(Modifier.padding(horizontal=20.dp,vertical=17.dp),verticalArrangement=Arrangement.spacedBy(2.dp)){
-     Text("DAL COTONE  /  COMERCIAL",color=Color(0xFFFFA9B1),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
-     Text(when(tab){"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-     Text("${salons.size} salões na carteira  •  ${salons.count{it.status=="cliente"}} clientes",color=Color(0xFFD6D3D9),style=MaterialTheme.typography.bodySmall)
+   Surface(shape=RoundedCornerShape(20.dp),color=Ink,modifier=Modifier.fillMaxWidth()){
+    Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+     Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
+      Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("DC",color=Color.White,fontWeight=FontWeight.ExtraBold)}
+     }
+     Column(Modifier.weight(1f)){
+      Text("DAL COTONE",color=Color(0xFFFFB6C0),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
+      Text(when(tab){"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     }
+     Column(horizontalAlignment=androidx.compose.ui.Alignment.End){
+      Text("${salons.size}",color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Text("salões",color=Color(0xFFD6D3D9),style=MaterialTheme.typography.labelSmall)
+     }
     }
    }
-   LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){items(listOf("Mapa","Cidades","Clientes","Rota","Agenda","Financeiro")){t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
-   if(message.isNotBlank())Surface(color=Color(0xFFF5E9EC),shape=RoundedCornerShape(12.dp)){Text(message,Modifier.fillMaxWidth().padding(10.dp),color=Ruby,style=MaterialTheme.typography.bodySmall)}
+   val navigationItems=listOf("Mapa" to "◉","Cidades" to "⌖","Clientes" to "♙","Rota" to "➤","Agenda" to "▦","Financeiro" to "R$")
+   LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
+    items(navigationItems){(target,symbol)->
+     val active=tab==target
+     Surface(onClick={tab=target;selected=null;message=""},shape=RoundedCornerShape(15.dp),
+      color=if(active)Ruby else Color.White,
+      border=if(active)null else androidx.compose.foundation.BorderStroke(1.dp,Color(0xFFE6E3E8))){
+      Row(Modifier.padding(horizontal=14.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
+       Text(symbol,color=if(active)Color.White else Ruby,fontWeight=FontWeight.Bold)
+       Text(target,color=if(active)Color.White else Ink,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium)
+      }
+     }
+    }
+   }
+   if(message.isNotBlank())Surface(color=Color(0xFFF5E9EC),shape=RoundedCornerShape(12.dp)){
+    Row(Modifier.fillMaxWidth().padding(10.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+     Text(message,Modifier.weight(1f),color=Ruby,style=MaterialTheme.typography.bodySmall)
+     TextButton(onClick={message=""},contentPadding=PaddingValues(horizontal=6.dp)){Text("Fechar")}
+    }
+   }
    if(selected!=null){
     val s=selected!!
     TextButton(onClick={selected=null}){Text("← Voltar")}
