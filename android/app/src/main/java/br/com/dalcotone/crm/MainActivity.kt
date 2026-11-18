@@ -62,6 +62,7 @@ class MainActivity:ComponentActivity(){
   var routeMode by remember{mutableStateOf(false)}
   var routeAll by remember{mutableStateOf(true)}
   var routeSelectedIds by remember{mutableStateOf<Set<String>>(emptySet())}
+  var routeBatch by remember{mutableIntStateOf(0)}
   var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
@@ -94,16 +95,40 @@ class MainActivity:ComponentActivity(){
    if(international.isBlank()){message="Número inválido para WhatsApp. Confira o DDD.";return}
    startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+international)))
   }
-  fun openRoute(stops:List<Salon>){
-   val eligible=stops.filter{it.latitude!=null&&it.longitude!=null}
+  fun routeOrder(stops:List<Salon>):List<Salon>{
+   val remaining=stops.filter{it.latitude!=null&&it.longitude!=null}.toMutableList()
+   val provider=when{
+    locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)->android.location.LocationManager.GPS_PROVIDER
+    locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)->android.location.LocationManager.NETWORK_PROVIDER
+    else->null
+   }
+   val here=try{if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)provider?.let{locationManager.getLastKnownLocation(it)} else null}catch(_:SecurityException){null}
+   var lat=here?.latitude?:remaining.firstOrNull()?.latitude?:return emptyList()
+   var lon=here?.longitude?:remaining.firstOrNull()?.longitude?:return emptyList()
+   val ordered=mutableListOf<Salon>()
+   while(remaining.isNotEmpty()){
+    val next=remaining.minByOrNull{s->
+     val out=FloatArray(1)
+     android.location.Location.distanceBetween(lat,lon,s.latitude!!,s.longitude!!,out)
+     out[0]
+    }!!
+    ordered.add(next);remaining.remove(next);lat=next.latitude!!;lon=next.longitude!!
+   }
+   return ordered
+  }
+  fun openRoute(stops:List<Salon>,batchIndex:Int=0){
+   val eligible=routeOrder(stops)
    if(eligible.isEmpty()){message="Nenhum cliente selecionado possui coordenadas para navegação.";return}
-   val batch=eligible.take(8)
+   val batches=eligible.chunked(8)
+   if(batchIndex !in batches.indices){message="Etapa não encontrada.";return}
+   val batch=batches[batchIndex]
    val points=batch.map{"${it.latitude},${it.longitude}"}
    val destination=Uri.encode(points.last())
    val waypoints=points.dropLast(1).joinToString("|")
    val url="https://www.google.com/maps/dir/?api=1&destination=$destination&travelmode=driving"+if(waypoints.isNotBlank())"&waypoints="+Uri.encode(waypoints) else ""
-   startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))
-   if(eligible.size>8)message="Rota aberta com 8 paradas. Restam ${eligible.size-8} clientes; divida a viagem em etapas."
+   try{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)));routeBatch=batchIndex
+    message="Etapa ${batchIndex+1} de ${batches.size} aberta no Maps. Ordem aproximada por proximidade; o Maps calcula trânsito e duração."
+   }catch(e:Exception){message="Não foi possível abrir o Google Maps: ${e.message}"}
   }
   fun navigate(s:Salon){val q=Uri.encode(listOf(s.address,s.city,"Paraíba Brasil").joinToString(" "));startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))}
   fun captureHere(){
@@ -266,10 +291,21 @@ class MainActivity:ComponentActivity(){
       FilterChip(selected=!routeAll,onClick={routeAll=false},label={Text("Selecionar paradas")})
      }
      Text("Rota total reúne clientes cadastrados na carteira. Confirme a localização antes de viajar.",style=MaterialTheme.typography.bodySmall)
-     Button(onClick={openRoute(if(routeAll)geolocated else geolocated.filter{it.id in routeSelectedIds})},modifier=Modifier.fillMaxWidth()){
-      Text("ABRIR ROTA NO GOOGLE MAPS")
+     val chosen=if(routeAll)geolocated else geolocated.filter{it.id in routeSelectedIds}
+     val ordered=remember(chosen){routeOrder(chosen)}
+     Text("${ordered.size} paradas • ${(ordered.size+7)/8} etapa(s)",style=MaterialTheme.typography.bodyMedium)
+     Text("Sequência preliminar por proximidade geográfica. O tempo real e as ruas são calculados pelo Google Maps após abrir cada etapa.",style=MaterialTheme.typography.bodySmall)
+     Button(onClick={openRoute(chosen,0)},enabled=chosen.isNotEmpty(),modifier=Modifier.fillMaxWidth()){
+      Text("INICIAR PRIMEIRA ETAPA NO GOOGLE MAPS")
      }
-     if(customers.size>8)Text("Rotas extensas são abertas em grupos de até 8 paradas. Não há otimização automática da ordem.",style=MaterialTheme.typography.bodySmall)
+     if(ordered.size>8) {
+      Text("Escolha a próxima etapa depois de concluir a anterior:",style=MaterialTheme.typography.bodySmall)
+      ordered.chunked(8).forEachIndexed{index,batch->
+       OutlinedButton(onClick={openRoute(chosen,index)},modifier=Modifier.fillMaxWidth()){
+        Text("Etapa ${index+1} • ${batch.size} paradas")
+       }
+      }
+     }
      LazyColumn{
       items(customers.sortedWith(compareBy({it.city},{it.name}))){s->
        Row(Modifier.fillMaxWidth().padding(vertical=6.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
