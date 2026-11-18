@@ -32,6 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -111,6 +113,52 @@ class MainActivity:ComponentActivity(){
   val osm=remember{OpenStreetMapRepository()}
   val cnpjLookup=remember{CnpjLookupRepository()}
   val money=remember{NumberFormat.getCurrencyInstance(Locale("pt","BR"))}
+  val db=remember{CrmDatabase.get(this)}
+  var voiceDraft by remember{mutableStateOf<String?>(null)}
+  val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+   if(uri!=null)scope.launch{
+    try{
+     val backup=withContext(Dispatchers.IO){CrmBackup.export(db)}
+     withContext(Dispatchers.IO){contentResolver.openOutputStream(uri)?.use{it.write(backup.toByteArray(Charsets.UTF_8))} ?: error("Não foi possível gravar o arquivo")}
+     message="Backup exportado. Guarde o arquivo em local seguro."
+    }catch(e:Exception){message="Erro no backup: ${e.message}"}
+   }
+  }
+  val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+   if(uri!=null)scope.launch{
+    try{
+     val count=withContext(Dispatchers.IO){
+      val json=contentResolver.openInputStream(uri)?.bufferedReader()?.use{it.readText()} ?: error("Arquivo inacessível")
+      CrmBackup.restore(db,json)
+     }
+     message="Backup restaurado: $count salões. Confira seus dados."
+    }catch(e:Exception){message="Falha ao restaurar: ${e.message}"}
+   }
+  }
+  val speechLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){result->
+   if(result.resultCode==android.app.Activity.RESULT_OK){
+    voiceDraft=result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+   }
+  }
+  fun speak(){
+   try{
+    speechLauncher.launch(Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{
+     putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+     putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,"pt-BR")
+     putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT,"Diga o resumo da visita ou próximo retorno")
+    })
+   }catch(e:Exception){message="Reconhecimento de voz não disponível neste aparelho."}
+  }
+  fun leadScore(s:Salon):Int {
+   var score=when(s.status){"cliente"->55;"retorno"->65;"nao_visitado"->50;"recusou"->5;"inativo"->15;else->30}
+   if(s.phone.isNotBlank())score+=10
+   if(s.latitude!=null&&s.longitude!=null)score+=10
+   if(s.lastContactAt==null)score+=10
+   else if(System.currentTimeMillis()-s.lastContactAt>30L*24*60*60*1000)score+=15
+   if(s.doNotContact)score=0
+   return score.coerceIn(0,100)
+  }
+
   fun whatsapp(raw:String){
    val digits=raw.filter{it.isDigit()}
    val international=when{
@@ -395,6 +443,16 @@ class MainActivity:ComponentActivity(){
       when(routeAudience){"clientes"->customer;"prospectos"->!customer&&s.status=="nao_visitado";else->customer||s.status=="nao_visitado"}
      }
      val geolocated=customers.filter{it.latitude!=null&&it.longitude!=null}
+     if(customers.isNotEmpty())PremiumCard{
+      Text("PRIORIDADES COMERCIAIS",color=Ruby,fontWeight=FontWeight.Bold)
+      customers.filter{!it.doNotContact}.sortedByDescending{leadScore(it)}.take(3).forEach{s->
+       Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+        Text(s.name,Modifier.weight(1f),maxLines=1)
+        Text("${leadScore(s)}/100",color=Ruby,fontWeight=FontWeight.Bold)
+        TextButton(onClick={selected=s}){Text("Ficha")}
+       }
+      }
+     }
      PremiumCard{
       Text("ESTABELECIMENTOS DISPONÍVEIS",style=MaterialTheme.typography.labelSmall,color=Muted)
       Text("${customers.size} salões  •  ${geolocated.size} com GPS",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Ink)
@@ -471,6 +529,10 @@ class MainActivity:ComponentActivity(){
        }
        TextButton(onClick={cnpjDialog=true},modifier=Modifier.weight(1f)){Text("Consultar CNPJ")}
       }
+      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+       OutlinedButton(onClick={speak()},modifier=Modifier.weight(1f)){Text("🎙 Anotar por voz")}
+       OutlinedButton(onClick={tab="Agenda"},modifier=Modifier.weight(1f)){Text("Agenda inteligente")}
+      }
       Text("Mapa: OpenStreetMap  •  Salões salvos disponíveis offline",color=Muted,style=MaterialTheme.typography.labelSmall)
       if(prospectList.isNotEmpty())Text("Oportunidades encontradas",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
       prospectList.take(20).forEach{p->
@@ -512,6 +574,18 @@ class MainActivity:ComponentActivity(){
     "Agenda"->{
      Text("Próximos compromissos",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("${appointments.count{!it.completed}} agendamentos registrados",color=Muted)
+     PremiumCard{
+      Text("RETORNOS SUGERIDOS",color=Ruby,fontWeight=FontWeight.Bold)
+      val pending=salons.filter{!it.doNotContact && (it.status=="retorno" || (it.lastContactAt!=null && System.currentTimeMillis()-it.lastContactAt>30L*24*60*60*1000))}
+       .sortedByDescending{leadScore(it)}.take(4)
+      if(pending.isEmpty())Text("Nenhum retorno prioritário no momento.",color=Muted)
+      pending.forEach{s->
+       Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+        Text(s.name,Modifier.weight(1f),color=Ink,maxLines=1)
+        TextButton(onClick={selected=s}){Text("Abrir ficha")}
+       }
+      }
+     }
      if(appointments.isEmpty())EmptyPanel("Sua agenda está livre","Abra a ficha de um salão e toque em Agendar para criar uma visita ou retorno.")
      LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(appointments){a->
       val s=salons.find{it.id==a.salonId}
@@ -524,6 +598,14 @@ class MainActivity:ComponentActivity(){
      }}
     }
     else->{
+     PremiumCard{
+      Text("SEGURANÇA DOS DADOS",color=Ruby,fontWeight=FontWeight.Bold)
+      Text("Salve uma cópia completa dos salões, visitas, agenda, vendas e pagamentos. O arquivo contém dados de clientes; guarde-o com segurança.",color=Muted)
+      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+       Button(onClick={exportLauncher.launch("dalcotone-backup-${java.text.SimpleDateFormat("yyyyMMdd",Locale.US).format(java.util.Date())}.json")},modifier=Modifier.weight(1f)){Text("Exportar backup")}
+       OutlinedButton(onClick={importLauncher.launch(arrayOf("application/json","text/plain"))},modifier=Modifier.weight(1f)){Text("Restaurar")}
+      }
+     }
      Text("Visão financeira",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
      PremiumCard{
       Text("TOTAL A RECEBER",color=Muted,style=MaterialTheme.typography.labelMedium)
@@ -544,6 +626,24 @@ class MainActivity:ComponentActivity(){
   }
   }
   }
+  if(voiceDraft!=null) AlertDialog(
+   onDismissRequest={voiceDraft=null},
+   title={Text("Anotação por voz")},
+   text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Text("Revise o texto antes de registrar. Nenhuma ação será executada automaticamente.",color=Muted)
+    OutlinedTextField(value=voiceDraft?:"",onValueChange={voiceDraft=it},modifier=Modifier.fillMaxWidth(),minLines=3)
+   }},
+   confirmButton={Button(onClick={
+    val draft=voiceDraft.orEmpty().trim()
+    if(draft.isNotBlank()){
+     val s=selected
+     if(s!=null)scope.launch{dao.saveSalon(s.copy(notes=(s.notes+"\\n"+draft).trim()));message="Anotação salva na ficha."}
+     else message="Anotação reconhecida. Abra uma ficha para associar o registro a um salão."
+    }
+    voiceDraft=null
+   }){Text("Confirmar anotação")}},
+   dismissButton={TextButton(onClick={voiceDraft=null}){Text("Cancelar")}}
+  )
   if(phoneEditor!=null) AlertDialog(
    onDismissRequest={phoneEditor=null},
    title={Text("WhatsApp do salão")},
