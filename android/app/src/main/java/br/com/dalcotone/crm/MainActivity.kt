@@ -63,10 +63,16 @@ class MainActivity:ComponentActivity(){
   var paymentMethod by remember{mutableStateOf("pix")}
   var prospectList by remember{mutableStateOf<List<Prospect>>(emptyList())}
   var chosenProspect by remember{mutableStateOf<Prospect?>(null)}
+  var cnpjDialog by remember{mutableStateOf(false)}
+  var cnpjText by remember{mutableStateOf("")}
+  var cnpjResult by remember{mutableStateOf<CnpjBusiness?>(null)}
+  var searching by remember{mutableStateOf(false)}
   val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationManager=remember{getSystemService(LOCATION_SERVICE) as android.location.LocationManager}
   val places=remember{PlacesRepository()}
+  val osm=remember{OpenStreetMapRepository()}
+  val cnpjLookup=remember{CnpjLookupRepository()}
   val money=remember{NumberFormat.getCurrencyInstance(Locale("pt","BR"))}
   fun navigate(s:Salon){val q=Uri.encode(listOf(s.address,s.city,"Paraíba Brasil").joinToString(" "));startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))}
   fun captureHere(){
@@ -91,6 +97,26 @@ class MainActivity:ComponentActivity(){
    val location=provider?.let{locationManager.getLastKnownLocation(it)}
    if(location==null){message="Sem posição recente. Ative o GPS e tente novamente.";return}
    scope.launch{try{val known=salons.mapNotNull{it.placeId}.toSet();prospectList=places.nearby(location.latitude,location.longitude).filter{it.placeId !in known};message="${prospectList.size} oportunidades encontradas."}catch(e:Exception){message=e.message?:"Busca indisponível"}}
+  }
+  fun searchOsm(){
+   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+    locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
+    message="Autorize a localização e toque novamente.";return
+   }
+   val provider=when{locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)->android.location.LocationManager.GPS_PROVIDER;locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)->android.location.LocationManager.NETWORK_PROVIDER;else->null}
+   val location=provider?.let{locationManager.getLastKnownLocation(it)}
+   if(location==null){message="Sem localização recente. Ative o GPS e tente novamente.";return}
+   scope.launch{
+    searching=true
+    try{
+     val known=salons.mapNotNull{it.placeId}.toSet()
+     val existing=prospectList.associateBy{it.placeId}
+     val found=osm.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
+     prospectList=(existing.values+found).distinctBy{it.placeId}
+     message="${found.size} salões encontrados no OpenStreetMap. Fonte comunitária; pode estar incompleta."
+    }catch(e:Exception){message=e.message?:"Busca OpenStreetMap indisponível"}
+    finally{searching=false}
+   }
   }
   Column(Modifier.fillMaxSize().background(Color.White).padding(16.dp)){
    Text("DAL COTONE",color=Ruby,fontWeight=FontWeight.Bold)
@@ -131,7 +157,10 @@ class MainActivity:ComponentActivity(){
       Text("Mapa OpenStreetMap: ruas precisam de internet na primeira visualização; pontos cadastrados ficam salvos offline.",style=MaterialTheme.typography.bodySmall)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
       Button(onClick={captureHere()},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
-      OutlinedButton(onClick={scan()},modifier=Modifier.fillMaxWidth()){Text("Buscar salões próximos (online)")}
+      OutlinedButton(onClick={scan()},modifier=Modifier.fillMaxWidth()){Text("Buscar no Google Places (online)")}
+      OutlinedButton(onClick={searchOsm()},enabled=!searching,modifier=Modifier.fillMaxWidth()){Text(if(searching)"Pesquisando..." else "Buscar no OpenStreetMap (online)")}
+      TextButton(onClick={cnpjDialog=true}){Text("Consultar CNPJ de um salão (online)")}
+      Text("Fontes: Google Places e OpenStreetMap para descoberta; Receita/CNPJ para consulta pontual; CRM SQLite para visitas e clientes.",style=MaterialTheme.typography.bodySmall)
       Text("Oportunidades encontradas: ${prospectList.size} • salve para acompanhar como Não visitado",style=MaterialTheme.typography.bodySmall)
       prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,status="nao_visitado"));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
      }
@@ -148,6 +177,22 @@ class MainActivity:ComponentActivity(){
     }
    }
   }
+  if(cnpjDialog) AlertDialog(
+   onDismissRequest={cnpjDialog=false},
+   title={Text("Consultar empresa pelo CNPJ")},
+   text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    OutlinedTextField(cnpjText,{cnpjText=it},label={Text("CNPJ (14 dígitos)")})
+    Text("Consulta online por dados públicos. Não encontra todos os salões por proximidade.",style=MaterialTheme.typography.bodySmall)
+    cnpjResult?.let{b->Text(b.tradeName.ifBlank{b.legalName});Text("${b.city} / ${b.state} • ${b.status}")}
+   }},
+   confirmButton={TextButton(onClick={
+    scope.launch{
+     try{cnpjResult=cnpjLookup.lookup(cnpjText);message="Consulta CNPJ concluída."}
+     catch(e:Exception){message=e.message?:"Falha na consulta CNPJ"}
+    }
+   }){Text("Consultar")}},
+   dismissButton={TextButton(onClick={cnpjDialog=false;cnpjResult=null}){Text("Fechar")}}
+  )
   if(chosenProspect!=null) AlertDialog(
    onDismissRequest={chosenProspect=null},
    title={Text(chosenProspect!!.name)},
