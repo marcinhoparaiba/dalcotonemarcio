@@ -219,7 +219,7 @@ class MainActivity:ComponentActivity(){
     Text(s.name,style=MaterialTheme.typography.titleLarge)
     Text("${s.city} • ${s.status}")
     Text(s.address)
-    Row{TextButton(onClick={navigate(s)}){Text("Abrir rota")};TextButton(onClick={if(s.phone.isNotBlank())whatsapp(s.phone)}){Text("WhatsApp")}}
+    Row{TextButton(onClick={navigate(s)}){Text("Abrir rota")};TextButton(onClick={if(s.phone.isNotBlank())whatsapp(s.phone)}){Text("Consultar WhatsApp")}}
     val ownSales=sales.filter{it.salonId==s.id}
     val outstanding=ownSales.sumOf{sale->sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents}}
     Text("Saldo a receber: ${money.format(outstanding/100.0)}",fontWeight=FontWeight.Bold,color=Ruby)
