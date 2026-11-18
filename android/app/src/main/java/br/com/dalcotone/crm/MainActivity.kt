@@ -58,6 +58,8 @@ class MainActivity:ComponentActivity(){
   var message by remember{mutableStateOf("")}
   var search by remember{mutableStateOf("")}
   var filter by remember{mutableStateOf("todos")}
+  var selectedCity by remember{mutableStateOf<String?>(null)}
+  var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
   var notes by remember{mutableStateOf("")}
@@ -149,7 +151,7 @@ class MainActivity:ComponentActivity(){
    Text("DAL COTONE",color=Ruby,fontWeight=FontWeight.Bold)
    Text("CRM Comercial",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
    Spacer(Modifier.height(12.dp))
-   Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("Mapa","Clientes","Agenda","Financeiro").forEach{t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
+   Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("Mapa","Cidades","Clientes","Agenda","Financeiro").forEach{t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
    if(message.isNotBlank())Text(message,color=Ruby,style=MaterialTheme.typography.bodySmall)
    if(selected!=null){
     val s=selected!!
@@ -177,6 +179,50 @@ class MainActivity:ComponentActivity(){
      }}
     }}
    }else when(tab){
+    "Cidades"->{
+     Text("Salões salvos por cidade",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("Sua carteira comercial separada das rotas e das oportunidades ainda não salvas.",style=MaterialTheme.typography.bodySmall)
+     if(selectedCity==null){
+      val groups=salons.groupBy{it.city.trim().ifBlank{"Cidade não informada"}}.toSortedMap()
+      LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)){
+       items(groups.entries.toList()){entry->
+        Card(onClick={selectedCity=entry.key},shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
+         Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){
+          Column{
+           Text(entry.key,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+           Text("${entry.value.size} salões salvos • ${entry.value.count{it.status=="nao_visitado"}} não visitados",style=MaterialTheme.typography.bodySmall)
+          }
+          Text("Abrir ›",color=Ruby)
+         }
+        }
+       }
+      }
+     }else{
+      TextButton(onClick={selectedCity=null}){Text("← Todas as cidades")}
+      Text(selectedCity!!,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+      Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+       listOf("todos","nao_visitado","cliente").forEach{f->
+        FilterChip(selected=cityFilter==f,onClick={cityFilter=f},label={Text(when(f){"todos"->"Todos";"nao_visitado"->"Não visitados";else->"Clientes"})})
+       }
+      }
+      LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){
+       items(salons.filter{it.city.trim().ifBlank{"Cidade não informada"}==selectedCity&&(cityFilter=="todos"||it.status==cityFilter)}.sortedBy{it.name}){s->
+        Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
+         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+          Text(s.name,fontWeight=FontWeight.Bold)
+          Text(s.address.ifBlank{"Endereço não informado"},style=MaterialTheme.typography.bodySmall)
+          Text(if(s.status=="nao_visitado")"Não visitado" else s.status,color=Ruby,style=MaterialTheme.typography.bodySmall)
+          Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+           TextButton(onClick={selected=s}){Text("Ficha")}
+           TextButton(onClick={navigate(s)}){Text("Rota")}
+           if(s.phone.isNotBlank())TextButton(onClick={whatsapp(s.phone)}){Text("WhatsApp")}
+          }
+         }
+        }
+       }
+      }
+     }
+    }
     "Mapa","Clientes"->{
      if(tab=="Mapa"){
       Surface(color=Color(0xFFF9F2F3),shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
