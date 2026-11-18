@@ -66,6 +66,7 @@ class MainActivity:ComponentActivity(){
   var routeBatch by remember{mutableIntStateOf(0)}
   var routeCity by remember{mutableStateOf<String?>(null)}
   var routeAudience by remember{mutableStateOf("clientes")}
+  var routeAudience by remember{mutableStateOf("clientes")}
   var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
@@ -211,7 +212,7 @@ class MainActivity:ComponentActivity(){
    Text("DAL COTONE",color=Ruby,fontWeight=FontWeight.Bold)
    Text("CRM Comercial",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
    Spacer(Modifier.height(12.dp))
-   Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("Mapa","Cidades","Clientes","Rota","Agenda","Financeiro").forEach{t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
+   LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){items(listOf("Mapa","Cidades","Clientes","Rota","Agenda","Financeiro")){t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
    if(message.isNotBlank())Text(message,color=Ruby,style=MaterialTheme.typography.bodySmall)
    if(selected!=null){
     val s=selected!!
