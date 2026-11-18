@@ -153,7 +153,8 @@ class MainActivity:ComponentActivity(){
   }
   val contactWindow=7L*24*60*60*1000
   fun contactDays(s:Salon):Long=if(s.lastContactAt==null)7L else ((System.currentTimeMillis()-s.lastContactAt).coerceAtLeast(0L)/(24L*60*60*1000))
-  fun contactDue(s:Salon):Boolean=!s.doNotContact && s.status!="recusou" && s.status!="inativo" && (s.lastContactAt==null || System.currentTimeMillis()-s.lastContactAt>=contactWindow)
+  fun isAttendedClient(s:Salon):Boolean=s.status=="cliente" || sales.any{it.salonId==s.id}
+  fun contactDue(s:Salon):Boolean=isAttendedClient(s) && !s.doNotContact && s.status!="recusou" && s.status!="inativo" && (s.lastContactAt==null || System.currentTimeMillis()-s.lastContactAt>=contactWindow)
   fun confirmContact(s:Salon){
    scope.launch{
     dao.saveSalon(s.copy(lastContactAt=System.currentTimeMillis()))
@@ -363,14 +364,15 @@ class MainActivity:ComponentActivity(){
      Text(
       when{
        s.doNotContact->"CONTATO BLOQUEADO"
+       !isAttendedClient(s)->"PROSPECTO • SEM ROTINA DE 7 DIAS"
        s.lastContactAt==null->"SEM CONTATO REGISTRADO • PRIORIDADE"
        contactDue(s)->"CONTATO ATRASADO • ${contactDays(s)} DIAS"
        contactDays(s)>=6->"CONTATO VENCE EM BREVE • ${contactDays(s)} DIAS"
        else->"CONTATO EM DIA • ${contactDays(s)} DIAS"
       },color=if(contactDue(s))Ruby else Muted,fontWeight=FontWeight.Bold
      )
-     Text("Próximo contato: "+(s.lastContactAt?.let{java.text.DateFormat.getDateInstance().format(java.util.Date(it+contactWindow))}?:"hoje"),color=Muted)
-     if(!s.doNotContact)OutlinedButton(onClick={confirmContact(s)},modifier=Modifier.fillMaxWidth()){
+     if(isAttendedClient(s))Text("Próximo contato: "+(s.lastContactAt?.let{java.text.DateFormat.getDateInstance().format(java.util.Date(it+contactWindow))}?:"hoje"),color=Muted)
+     if(isAttendedClient(s) && !s.doNotContact)OutlinedButton(onClick={confirmContact(s)},modifier=Modifier.fillMaxWidth()){
       Text("✓ Confirmar que enviei a mensagem")
      }
      Text("AÇÕES RÁPIDAS",color=Muted,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
@@ -601,11 +603,11 @@ class MainActivity:ComponentActivity(){
      Text("Próximos compromissos",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("${appointments.count{!it.completed}} agendamentos registrados",color=Muted)
      PremiumCard{
-      Text("CONTATOS EM ATÉ 7 DIAS",color=Ruby,fontWeight=FontWeight.Bold)
+      Text("CLIENTES ATENDIDOS • CONTATO A CADA 7 DIAS",color=Ruby,fontWeight=FontWeight.Bold)
       Text("${salons.count{contactDue(it)}} salões precisam de contato agora",color=Muted)
-      val pending=salons.filter{contactDue(it) || (!it.doNotContact && it.status=="retorno")}
+      val pending=salons.filter{contactDue(it)}
        .sortedWith(compareByDescending<Salon>{contactDue(it)}.thenByDescending{contactDays(it)}).take(20)
-      if(pending.isEmpty())Text("Nenhum retorno prioritário no momento.",color=Muted)
+      if(pending.isEmpty())Text("Todas as clientes atendidas estão em dia.",color=Muted)
       pending.forEach{s->
        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
         Text(s.name,Modifier.weight(1f),color=Ink,maxLines=1)
