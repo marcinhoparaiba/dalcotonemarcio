@@ -104,7 +104,7 @@ class MainActivity:ComponentActivity(){
      if(tab=="Mapa"){
       Text("Radar comercial • 10 km",fontWeight=FontWeight.Bold)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
-      Button(onClick={::scan}){Text("Buscar salões próximos (online)")}
+      Button(onClick={scan}){Text("Buscar salões próximos (online)")}
       prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
      }
      OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},modifier=Modifier.fillMaxWidth())
@@ -115,7 +115,7 @@ class MainActivity:ComponentActivity(){
     "Agenda"->LazyColumn{items(appointments){a->val s=salons.find{it.id==a.salonId};Card(Modifier.fillMaxWidth().padding(vertical=5.dp)){Column(Modifier.padding(12.dp)){Text(s?.name?:"Salão");Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(a.startsAt)));Text(a.notes)}}}}
     else->{
      Text("Total a receber",style=MaterialTheme.typography.titleMedium)
-     Text(money.format(sales.sumOf{it.totalCents}.minus(payments.sumOf{it.amountCents})/100.0),color=Ruby,style=MaterialTheme.typography.headlineMedium)
+     Text(money.format((sales.sumOf{it.totalCents}-payments.sumOf{it.amountCents})/100.0),color=Ruby,style=MaterialTheme.typography.headlineMedium)
      LazyColumn{items(sales){sale->val s=salons.find{it.id==sale.salonId};Text("${s?.name}: ${money.format((sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents})/100.0)}")}}
     }
    }
