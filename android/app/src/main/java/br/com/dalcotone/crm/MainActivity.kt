@@ -223,7 +223,14 @@ class MainActivity:ComponentActivity(){
     finally{searching=false}
    }
   }
-  Column(Modifier.fillMaxSize().background(CanvasBg).padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+  Box(Modifier.fillMaxSize()){
+   androidx.compose.foundation.Image(
+    painter=androidx.compose.ui.res.painterResource(if(tab=="Rota"||tab=="Mapa")R.drawable.dalcotone_route_bg else R.drawable.dalcotone_luxe_bg),
+    contentDescription=null,
+    contentScale=androidx.compose.ui.layout.ContentScale.FillBounds,
+    modifier=Modifier.fillMaxSize()
+   )
+   Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
    Surface(shape=RoundedCornerShape(20.dp),color=Ink,modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
      Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
@@ -504,6 +511,7 @@ class MainActivity:ComponentActivity(){
      }}
     }
    }
+  }
   }
   if(cnpjDialog) AlertDialog(
    onDismissRequest={cnpjDialog=false},
