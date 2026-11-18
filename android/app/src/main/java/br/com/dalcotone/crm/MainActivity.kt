@@ -59,6 +59,9 @@ class MainActivity:ComponentActivity(){
   var search by remember{mutableStateOf("")}
   var filter by remember{mutableStateOf("todos")}
   var selectedCity by remember{mutableStateOf<String?>(null)}
+  var routeMode by remember{mutableStateOf(false)}
+  var routeAll by remember{mutableStateOf(true)}
+  var routeSelectedIds by remember{mutableStateOf<Set<String>>(emptySet())}
   var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
@@ -90,6 +93,17 @@ class MainActivity:ComponentActivity(){
    val international=when{digits.length==10||digits.length==11->"55"+digits;digits.length in 12..13&&digits.startsWith("55")->digits;else->""}
    if(international.isBlank()){message="Número inválido para WhatsApp. Confira o DDD.";return}
    startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+international)))
+  }
+  fun openRoute(stops:List<Salon>){
+   val eligible=stops.filter{it.latitude!=null&&it.longitude!=null}
+   if(eligible.isEmpty()){message="Nenhum cliente selecionado possui coordenadas para navegação.";return}
+   val batch=eligible.take(8)
+   val points=batch.map{"${it.latitude},${it.longitude}"}
+   val destination=Uri.encode(points.last())
+   val waypoints=points.dropLast(1).joinToString("|")
+   val url="https://www.google.com/maps/dir/?api=1&destination=$destination&travelmode=driving"+if(waypoints.isNotBlank())"&waypoints="+Uri.encode(waypoints) else ""
+   startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))
+   if(eligible.size>8)message="Rota aberta com 8 paradas. Restam ${eligible.size-8} clientes; divida a viagem em etapas."
   }
   fun navigate(s:Salon){val q=Uri.encode(listOf(s.address,s.city,"Paraíba Brasil").joinToString(" "));startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))}
   fun captureHere(){
@@ -169,7 +183,7 @@ class MainActivity:ComponentActivity(){
    Text("DAL COTONE",color=Ruby,fontWeight=FontWeight.Bold)
    Text("CRM Comercial",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
    Spacer(Modifier.height(12.dp))
-   Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("Mapa","Cidades","Clientes","Agenda","Financeiro").forEach{t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
+   Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("Mapa","Cidades","Clientes","Rota","Agenda","Financeiro").forEach{t->FilterChip(selected=tab==t,onClick={tab=t;selected=null},label={Text(t)})}}
    if(message.isNotBlank())Text(message,color=Ruby,style=MaterialTheme.typography.bodySmall)
    if(selected!=null){
     val s=selected!!
@@ -237,6 +251,34 @@ class MainActivity:ComponentActivity(){
           }
          }
         }
+       }
+      }
+     }
+    }
+    "Rota"->{
+     Text("FAZER ROTA",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("Somente clientes com primeira venda ou marcados como cliente.",style=MaterialTheme.typography.bodySmall)
+     val customers=salons.filter{it.status=="cliente"||sales.any{sale->sale.salonId==it.id}}
+     val geolocated=customers.filter{it.latitude!=null&&it.longitude!=null}
+     Text("${customers.size} clientes • ${geolocated.size} com GPS",color=Ruby,fontWeight=FontWeight.Bold)
+     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+      FilterChip(selected=routeAll,onClick={routeAll=true},label={Text("ROTA TOTAL")})
+      FilterChip(selected=!routeAll,onClick={routeAll=false},label={Text("Selecionar paradas")})
+     }
+     Text("Rota total reúne clientes cadastrados na carteira. Confirme a localização antes de viajar.",style=MaterialTheme.typography.bodySmall)
+     Button(onClick={openRoute(if(routeAll)geolocated else geolocated.filter{it.id in routeSelectedIds})},modifier=Modifier.fillMaxWidth()){
+      Text("ABRIR ROTA NO GOOGLE MAPS")
+     }
+     if(customers.size>8)Text("Rotas extensas são abertas em grupos de até 8 paradas. Não há otimização automática da ordem.",style=MaterialTheme.typography.bodySmall)
+     LazyColumn{
+      items(customers.sortedWith(compareBy({it.city},{it.name}))){s->
+       Row(Modifier.fillMaxWidth().padding(vertical=6.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+        if(!routeAll)Checkbox(checked=s.id in routeSelectedIds,onCheckedChange={checked->routeSelectedIds=if(checked)routeSelectedIds+s.id else routeSelectedIds-s.id})
+        Column(Modifier.weight(1f)){
+         Text(s.name,fontWeight=FontWeight.Bold)
+         Text("${s.city.ifBlank{"Cidade não informada"}} • ${if(s.latitude==null||s.longitude==null)"Sem GPS" else "GPS salvo"}",style=MaterialTheme.typography.bodySmall)
+        }
+        TextButton(onClick={selected=s}){Text("Ficha")}
        }
       }
      }
@@ -364,9 +406,9 @@ class MainActivity:ComponentActivity(){
    dismissButton={TextButton(onClick={quickCapture=false}){Text("Cancelar")}}
   )
   if(add) AlertDialog(onDismissRequest={add=false},title={Text("Novo salão")},text={Column{OutlinedTextField(name,{name=it},label={Text("Nome")});OutlinedTextField(city,{city=it},label={Text("Cidade")});OutlinedTextField(address,{address=it},label={Text("Endereço")});OutlinedTextField(phone,{phone=it},label={Text("Telefone")})}},confirmButton={TextButton(onClick={if(name.isNotBlank()){scope.launch{dao.saveSalon(Salon(name=name,city=city,address=address,phone=phone))};add=false;name="";city="";address="";phone=""}}){Text("Salvar")}},dismissButton={TextButton(onClick={add=false}){Text("Cancelar")}})
-  if(editOutcome&&selected!=null)AlertDialog(onDismissRequest={editOutcome=false},title={Text("Registrar atendimento")},text={Column{listOf("cliente","retorno","recusou","inativo").forEach{f->Row{RadioButton(selected=outcome==f,onClick={outcome=f});Text(f)}};OutlinedTextField(notes,{notes=it},label={Text("Observações")})}},confirmButton={TextButton(onClick={val s=selected!!;scope.launch{dao.addVisit(Visit(salonId=s.id,outcome=outcome,notes=notes));val updated=s.copy(status=outcome,lastContactAt=System.currentTimeMillis(),notes=notes,doNotContact=outcome=="recusou");dao.saveSalon(updated);selected=updated};editOutcome=false}){Text("Registrar")}})
+  if(editOutcome&&selected!=null)AlertDialog(onDismissRequest={editOutcome=false},title={Text("Registrar visita • Se tornou cliente?")},text={Column{listOf("cliente","retorno","recusou","inativo").forEach{f->Row{RadioButton(selected=outcome==f,onClick={outcome=f});Text(f)}};OutlinedTextField(notes,{notes=it},label={Text("Observações")})}},confirmButton={TextButton(onClick={val s=selected!!;scope.launch{dao.addVisit(Visit(salonId=s.id,outcome=outcome,notes=notes));val updated=s.copy(status=outcome,lastContactAt=System.currentTimeMillis(),notes=notes,doNotContact=outcome=="recusou");dao.saveSalon(updated);selected=updated};editOutcome=false}){Text("Registrar")}})
   if(schedule&&selected!=null)AlertDialog(onDismissRequest={schedule=false},title={Text("Agendar retorno")},text={Column{Text("Data e hora: AAAA-MM-DD HH:MM");OutlinedTextField(dateTime,{dateTime=it});Text("Lembrete 30 minutos antes, offline")}},confirmButton={TextButton(onClick={try{val formatter=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");val at=java.time.LocalDateTime.parse(dateTime,formatter).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();val s=selected!!;val a=Appointment(salonId=s.id,startsAt=at);scope.launch{dao.addAppointment(a)};val exact=Reminders.schedule(this,a,s.name);message=if(exact)"Agendado com alarme exato." else "Agendado; alerta pode atrasar conforme Android.";if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS));schedule=false}catch(e:Exception){message="Data inválida: use AAAA-MM-DD HH:MM"}}){Text("Salvar")}})
-  if(sell&&selected!=null)AlertDialog(onDismissRequest={sell=false},title={Text("Nova venda")},text={Column{OutlinedTextField(product,{product=it},label={Text("Produto")});OutlinedTextField(qty,{qty=it},label={Text("Quantidade")});OutlinedTextField(price,{price=it},label={Text("Preço unitário (R$)")})}},confirmButton={TextButton(onClick={val q=qty.toIntOrNull();val cents=(price.replace(",",".").toBigDecimalOrNull()?.multiply(java.math.BigDecimal(100)))?.toLong();if(q!=null&&q>0&&cents!=null&&cents>0&&product.isNotBlank()){val sale=Sale(salonId=selected!!.id,dueAt=null,totalCents=q*cents);scope.launch{dao.addSale(sale);dao.addItem(SaleItem(saleId=sale.id,product=product,quantity=q,unitPriceCents=cents))};sell=false;product="";price=""}else message="Confira os valores."}){Text("Salvar")}})
+  if(sell&&selected!=null)AlertDialog(onDismissRequest={sell=false},title={Text("Nova venda")},text={Column{OutlinedTextField(product,{product=it},label={Text("Produto")});OutlinedTextField(qty,{qty=it},label={Text("Quantidade")});OutlinedTextField(price,{price=it},label={Text("Preço unitário (R$)")})}},confirmButton={TextButton(onClick={val q=qty.toIntOrNull();val cents=(price.replace(",",".").toBigDecimalOrNull()?.multiply(java.math.BigDecimal(100)))?.toLong();if(q!=null&&q>0&&cents!=null&&cents>0&&product.isNotBlank()){val sale=Sale(salonId=selected!!.id,dueAt=null,totalCents=q*cents);scope.launch{dao.addSale(sale);dao.addItem(SaleItem(saleId=sale.id,product=product,quantity=q,unitPriceCents=cents));val current=selected!!;val updated=current.copy(status="cliente");dao.saveSalon(updated);selected=updated;message="Venda registrada. Salão classificado automaticamente como Cliente."};sell=false;product="";price=""}else message="Confira os valores."}){Text("Salvar")}})
   if(paymentSale!=null)AlertDialog(
    onDismissRequest={paymentSale=null},
    title={Text("Registrar pagamento parcial")},
