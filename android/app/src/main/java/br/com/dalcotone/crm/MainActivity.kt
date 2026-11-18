@@ -65,6 +65,7 @@ class MainActivity:ComponentActivity(){
   var routeSelectedIds by remember{mutableStateOf<Set<String>>(emptySet())}
   var routeBatch by remember{mutableIntStateOf(0)}
   var routeCity by remember{mutableStateOf<String?>(null)}
+  var routeAudience by remember{mutableStateOf("clientes")}
   var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
@@ -284,15 +285,23 @@ class MainActivity:ComponentActivity(){
     }
     "Rota"->{
      Text("FAZER ROTA",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     Text("Somente clientes com primeira venda ou marcados como cliente.",style=MaterialTheme.typography.bodySmall)
-     val customers=salons.filter{it.status=="cliente"||sales.any{sale->sale.salonId==it.id}}
+     Text("Rotas de clientes, prospecção ou mistas.",style=MaterialTheme.typography.bodySmall)
+     Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+      listOf("clientes" to "Clientes","prospectos" to "Prospectos","ambos" to "Mista").forEach{(value,label)->
+       FilterChip(selected=routeAudience==value,onClick={routeAudience=value;routeSelectedIds=emptySet()},label={Text(label)})
+      }
+     }
+     val customers=salons.filter{s->
+      val customer=s.status=="cliente"||sales.any{sale->sale.salonId==s.id}
+      when(routeAudience){"clientes"->customer;"prospectos"->!customer&&s.status=="nao_visitado";else->customer||s.status=="nao_visitado"}
+     }
      val geolocated=customers.filter{it.latitude!=null&&it.longitude!=null}
      Text("${customers.size} clientes • ${geolocated.size} com GPS",color=Ruby,fontWeight=FontWeight.Bold)
      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
       FilterChip(selected=routeAll,onClick={routeAll=true},label={Text("ROTA TOTAL")})
       FilterChip(selected=!routeAll,onClick={routeAll=false},label={Text("Selecionar paradas")})
      }
-     Text("Selecione uma cidade ou use todas as cidades. Dentro dela, escolha todos ou apenas alguns clientes.",style=MaterialTheme.typography.bodySmall)
+     Text("Selecione uma cidade ou use todas. Escolha todos ou apenas alguns salões.",style=MaterialTheme.typography.bodySmall)
      val routeCities=customers.map{it.city.trim().ifBlank{"Cidade não informada"}}.distinct().sorted()
      Text("Cidades",fontWeight=FontWeight.Bold)
      LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
@@ -301,7 +310,7 @@ class MainActivity:ComponentActivity(){
      }
      val inCity=geolocated.filter{routeCity==null||it.city.trim().ifBlank{"Cidade não informada"}==routeCity}
      val chosen=if(routeAll)inCity else inCity.filter{it.id in routeSelectedIds}
-     val ordered=remember(chosen){routeOrder(chosen)}
+     val ordered=routeOrder(chosen)
      Text("${ordered.size} paradas • ${(ordered.size+7)/8} etapa(s)",style=MaterialTheme.typography.bodyMedium)
      Text("Sequência preliminar por proximidade geográfica. O tempo real e as ruas são calculados pelo Google Maps após abrir cada etapa.",style=MaterialTheme.typography.bodySmall)
      Button(onClick={openRoute(chosen,0)},enabled=chosen.isNotEmpty(),modifier=Modifier.fillMaxWidth()){
