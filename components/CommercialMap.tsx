@@ -1,0 +1,26 @@
+"use client";
+import {useEffect,useRef,useState} from "react";
+import type {Salon} from "../lib/types";
+import {supabaseBrowser} from "../lib/supabase";
+type Prospect={placeId:string;name:string;address:string;lat?:number;lng?:number;mapsUrl?:string;status?:string};
+type Props={salons:Salon[];onOpen:(id:string)=>void;onProspect:(prospect:Prospect)=>void;travel:boolean};
+type MapsGlobal=Window & {google?:any};
+const statusColors:Record<string,string>={cliente:"#16885d",retorno:"#e8982b",recusou:"#c72c38",nao_visitado:"#77808d",inativo:"#4b5563"};
+export default function CommercialMap({salons,onOpen,onProspect,travel}:Props){
+ const holder=useRef<HTMLDivElement>(null),map=useRef<any>(null),markers=useRef<any[]>([]);
+ const [location,setLocation]=useState<{lat:number;lng:number}|null>(null);
+ const [prospects,setProspects]=useState<Prospect[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(false);
+ const configured=Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+ useEffect(()=>{if(!configured||!holder.current)return;let cancelled=false;const win=window as MapsGlobal;const init=()=>{if(cancelled||!holder.current||!win.google?.maps)return;map.current=new win.google.maps.Map(holder.current,{center:{lat:-7.12,lng:-34.86},zoom:12,mapTypeControl:false,streetViewControl:false,fullscreenControl:false,styles:[{featureType:"poi",elementType:"labels",stylers:[{visibility:"off"}]}]});};
+ if(win.google?.maps){init();return()=>{cancelled=true}};
+ const existing=document.querySelector<HTMLScriptElement>('script[data-google-maps="true"]');
+ const script=existing||document.createElement("script");if(!existing){script.dataset.googleMaps="true";script.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY||"");script.async=true;document.head.appendChild(script)}script.addEventListener("load",init);return()=>{cancelled=true;script.removeEventListener("load",init)}},[configured]);
+ useEffect(()=>{const g=(window as MapsGlobal).google;if(!map.current||!g?.maps)return;markers.current.forEach(m=>m.setMap(null));markers.current=[];for(const s of salons){if(typeof s.latitude!=="number"||typeof s.longitude!=="number")continue;const marker=new g.maps.Marker({map:map.current,position:{lat:s.latitude,lng:s.longitude},title:s.name,icon:{path:g.maps.SymbolPath.CIRCLE,scale:11,fillColor:statusColors[s.status],fillOpacity:1,strokeColor:"#ffffff",strokeWeight:3}});marker.addListener("click",()=>onOpen(s.id));markers.current.push(marker)}
+ for(const p of prospects){if(typeof p.lat!=="number"||typeof p.lng!=="number")continue;const marker=new g.maps.Marker({map:map.current,position:{lat:p.lat,lng:p.lng},title:p.name,label:{text:"+",color:"#ffffff",fontWeight:"bold"},icon:{path:g.maps.SymbolPath.CIRCLE,scale:12,fillColor:"#77808d",fillOpacity:1,strokeColor:"#fff",strokeWeight:2}});marker.addListener("click",()=>onProspect(p));markers.current.push(marker)}
+ if(location)map.current.panTo(location);
+ },[salons,prospects,location,onOpen,onProspect]);
+ const locate=()=>{if(!navigator.geolocation){setError("Geolocalização indisponível.");return}navigator.geolocation.getCurrentPosition(p=>{setLocation({lat:p.coords.latitude,lng:p.coords.longitude});setError("")},()=>setError("Permita o acesso à localização no navegador."),{enableHighAccuracy:true,timeout:12000,maximumAge:60000})};
+ useEffect(()=>{if(travel)locate()},[travel]);
+ const scan=async()=>{if(!location){locate();setError("Obtenha sua localização e toque novamente em Buscar salões.");return}setLoading(true);setError("");try{const client=supabaseBrowser();if(!client)throw Error("Configure Supabase e entre na sua conta para pesquisar no Google Places.");const {data:{session}}=await client.auth.getSession();if(!session)throw Error("Faça login para pesquisar salões.");const response=await fetch(`/api/places?lat=${location.lat}&lng=${location.lng}`,{headers:{Authorization:`Bearer ${session.access_token}`}});const json=await response.json();if(!response.ok)throw Error(json.error||"Falha na pesquisa");const known=new Set(salons.map(s=>s.placeId).filter(Boolean));setProspects((json.places||[]).filter((p:Prospect)=>!known.has(p.placeId)));}catch(e){setError(e instanceof Error?e.message:"Falha na pesquisa")}finally{setLoading(false)}};
+ return <section aria-label="Mapa comercial"><div className="map-actions"><button onClick={locate}>Minha localização</button><button onClick={scan} disabled={loading}>{loading?"Buscando...":"Buscar salões • 10 km"}</button></div>{configured?<div ref={holder} className="map-real"/>:<div className="map"><div className="map-grid"/><div className="map-title">Mapa aguardando chave Google Maps</div><div className="map-foot">A lista de clientes continua disponível abaixo.</div></div>}{error&&<p className="notice" role="alert">{error}</p>}{prospects.length>0&&<div className="panel"><h3>Oportunidades não cadastradas ({prospects.length})</h3>{prospects.map(p=><div className="listrow" key={p.placeId}><div><b>{p.name}</b><small>{p.address}</small></div><button onClick={()=>onProspect(p)}>Avaliar</button></div>)}</div>}<p className="notice">A busca depende de autorização e Google Places. Resultados podem não incluir todos os salões; confirme o funcionamento antes de visitar.</p></section>
+}
