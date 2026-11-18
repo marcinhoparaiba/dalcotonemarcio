@@ -348,6 +348,7 @@ class MainActivity:ComponentActivity(){
      Text(statusLabel(s.status),color=Ruby,fontWeight=FontWeight.SemiBold)
      Text(s.city.ifBlank{"Cidade não informada"},color=Muted)
      if(s.address.isNotBlank())Text(s.address,color=Muted)
+     Text("PRIORIDADE COMERCIAL  •  ${leadScore(s)}/100",color=Ruby,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
      Text("AÇÕES RÁPIDAS",color=Muted,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
      Button(onClick={openSalonWhatsapp(s)},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF168956)),shape=RoundedCornerShape(14.dp)){
       Text(if(s.phone.filter{it.isDigit()}.length>=10)"◉  Conversar pelo WhatsApp" else "＋  Adicionar WhatsApp",color=Color.White)
@@ -637,7 +638,7 @@ class MainActivity:ComponentActivity(){
     val draft=voiceDraft.orEmpty().trim()
     if(draft.isNotBlank()){
      val s=selected
-     if(s!=null)scope.launch{dao.saveSalon(s.copy(notes=(s.notes+"\\n"+draft).trim()));message="Anotação salva na ficha."}
+     if(s!=null)scope.launch{dao.saveSalon(s.copy(notes=(s.notes+"\n"+draft).trim()));message="Anotação salva na ficha."}
      else message="Anotação reconhecida. Abra uma ficha para associar o registro a um salão."
     }
     voiceDraft=null
