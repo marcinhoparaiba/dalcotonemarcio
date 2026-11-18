@@ -43,6 +43,10 @@ class MainActivity:ComponentActivity(){
   var tab by remember{mutableStateOf("Mapa")}
   var selected by remember{mutableStateOf<Salon?>(null)}
   var add by remember{mutableStateOf(false)}
+  var quickCapture by remember{mutableStateOf(false)}
+  var capturedLatitude by remember{mutableStateOf<Double?>(null)}
+  var capturedLongitude by remember{mutableStateOf<Double?>(null)}
+  var capturedAccuracy by remember{mutableStateOf<Float?>(null)}
   var name by remember{mutableStateOf("")};var city by remember{mutableStateOf("")};var address by remember{mutableStateOf("")};var phone by remember{mutableStateOf("")}
   var message by remember{mutableStateOf("")}
   var search by remember{mutableStateOf("")}
@@ -64,6 +68,20 @@ class MainActivity:ComponentActivity(){
   val places=remember{PlacesRepository()}
   val money=remember{NumberFormat.getCurrencyInstance(Locale("pt","BR"))}
   fun navigate(s:Salon){val q=Uri.encode(listOf(s.address,s.city,"Paraíba Brasil").joinToString(" "));startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))}
+  fun captureHere(){
+   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+    locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION));message="Autorize o GPS e toque novamente em Salvar salão aqui.";return
+   }
+   val provider=when{locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)->android.location.LocationManager.GPS_PROVIDER;locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)->android.location.LocationManager.NETWORK_PROVIDER;else->null}
+   if(provider==null){message="Ative a localização do celular.";return}
+   try{
+    locationManager.getCurrentLocation(provider,null,mainExecutor){location->
+     if(location==null){message="Não foi possível obter o ponto. Tente novamente em local aberto."}
+     else if(location.accuracy>100f){message="Precisão baixa (${location.accuracy.toInt()} m). Aguarde e tente novamente."}
+     else{capturedLatitude=location.latitude;capturedLongitude=location.longitude;capturedAccuracy=location.accuracy;quickCapture=true;message="Localização capturada. Informe o nome do salão."}
+    }
+   }catch(e:SecurityException){message="Permissão de localização necessária."}
+  }
   fun scan(){
    if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
     locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION));message="Autorize a localização e toque novamente.";return
@@ -109,7 +127,8 @@ class MainActivity:ComponentActivity(){
      if(tab=="Mapa"){
       Text("Radar comercial • 10 km",fontWeight=FontWeight.Bold)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
-      Button(onClick={scan}){Text("Buscar salões próximos (online)")}
+      Button(onClick={captureHere},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
+      OutlinedButton(onClick={scan},modifier=Modifier.fillMaxWidth()){Text("Buscar salões próximos (online)")}
       prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
      }
      OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},modifier=Modifier.fillMaxWidth())
@@ -125,6 +144,27 @@ class MainActivity:ComponentActivity(){
     }
    }
   }
+  if(quickCapture) AlertDialog(
+   onDismissRequest={quickCapture=false},
+   title={Text("Salvar salão encontrado")},
+   text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Text("Ponto salvo pelo GPS • status automático: Não visitado",color=Ruby)
+    Text("Latitude: ${capturedLatitude ?: "-"}  Longitude: ${capturedLongitude ?: "-"}",style=MaterialTheme.typography.bodySmall)
+    Text("Precisão aproximada: ${capturedAccuracy?.toInt() ?: 0} metros",style=MaterialTheme.typography.bodySmall)
+    OutlinedTextField(name,{name=it},label={Text("Nome do salão *")},modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(address,{address=it},label={Text("Endereço (opcional, offline)")},modifier=Modifier.fillMaxWidth())
+   }},
+   confirmButton={TextButton(onClick={
+    val lat=capturedLatitude;val lon=capturedLongitude
+    if(name.isBlank()||lat==null||lon==null){message="Informe o nome e capture o GPS."}
+    else{
+     val salon=Salon(name=name.trim(),address=address.trim(),latitude=lat,longitude=lon,status="nao_visitado")
+     scope.launch{dao.saveSalon(salon);message="Salão salvo offline como Não visitado."}
+     quickCapture=false;name="";address="";capturedLatitude=null;capturedLongitude=null;capturedAccuracy=null
+    }
+   }){Text("Salvar ponto")}},
+   dismissButton={TextButton(onClick={quickCapture=false}){Text("Cancelar")}}
+  )
   if(add) AlertDialog(onDismissRequest={add=false},title={Text("Novo salão")},text={Column{OutlinedTextField(name,{name=it},label={Text("Nome")});OutlinedTextField(city,{city=it},label={Text("Cidade")});OutlinedTextField(address,{address=it},label={Text("Endereço")});OutlinedTextField(phone,{phone=it},label={Text("Telefone")})}},confirmButton={TextButton(onClick={if(name.isNotBlank()){scope.launch{dao.saveSalon(Salon(name=name,city=city,address=address,phone=phone))};add=false;name="";city="";address="";phone=""}}){Text("Salvar")}},dismissButton={TextButton(onClick={add=false}){Text("Cancelar")}})
   if(editOutcome&&selected!=null)AlertDialog(onDismissRequest={editOutcome=false},title={Text("Registrar atendimento")},text={Column{listOf("cliente","retorno","recusou","inativo").forEach{f->Row{RadioButton(selected=outcome==f,onClick={outcome=f});Text(f)}};OutlinedTextField(notes,{notes=it},label={Text("Observações")})}},confirmButton={TextButton(onClick={val s=selected!!;scope.launch{dao.addVisit(Visit(salonId=s.id,outcome=outcome,notes=notes));val updated=s.copy(status=outcome,lastContactAt=System.currentTimeMillis(),notes=notes,doNotContact=outcome=="recusou");dao.saveSalon(updated);selected=updated};editOutcome=false}){Text("Registrar")}})
   if(schedule&&selected!=null)AlertDialog(onDismissRequest={schedule=false},title={Text("Agendar retorno")},text={Column{Text("Data e hora: AAAA-MM-DD HH:MM");OutlinedTextField(dateTime,{dateTime=it});Text("Lembrete 30 minutos antes, offline")}},confirmButton={TextButton(onClick={try{val formatter=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");val at=java.time.LocalDateTime.parse(dateTime,formatter).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();val s=selected!!;val a=Appointment(salonId=s.id,startsAt=at);scope.launch{dao.addAppointment(a)};val exact=Reminders.schedule(this,a,s.name);message=if(exact)"Agendado com alarme exato." else "Agendado; alerta pode atrasar conforme Android.";if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS));schedule=false}catch(e:Exception){message="Data inválida: use AAAA-MM-DD HH:MM"}}){Text("Salvar")}})
