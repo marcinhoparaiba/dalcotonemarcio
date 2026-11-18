@@ -62,6 +62,7 @@ class MainActivity:ComponentActivity(){
   var amount by remember{mutableStateOf("")}
   var paymentMethod by remember{mutableStateOf("pix")}
   var prospectList by remember{mutableStateOf<List<Prospect>>(emptyList())}
+  var chosenProspect by remember{mutableStateOf<Prospect?>(null)}
   val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationManager=remember{getSystemService(LOCATION_SERVICE) as android.location.LocationManager}
@@ -126,12 +127,13 @@ class MainActivity:ComponentActivity(){
     "Mapa","Clientes"->{
      if(tab=="Mapa"){
       Text("Radar comercial • 10 km",fontWeight=FontWeight.Bold)
-      SalonMap(salons=salons,onSelect={selected=it},modifier=Modifier.fillMaxWidth().height(340.dp))
+      SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxWidth().height(340.dp))
       Text("Mapa OpenStreetMap: ruas precisam de internet na primeira visualização; pontos cadastrados ficam salvos offline.",style=MaterialTheme.typography.bodySmall)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
       Button(onClick={captureHere()},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
       OutlinedButton(onClick={scan()},modifier=Modifier.fillMaxWidth()){Text("Buscar salões próximos (online)")}
-      prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
+      Text("Oportunidades encontradas: ${prospectList.size} • salve para acompanhar como Não visitado",style=MaterialTheme.typography.bodySmall)
+      prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,status="nao_visitado"));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
      }
      OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},modifier=Modifier.fillMaxWidth())
      Row{listOf("todos","cliente","retorno","nao_visitado").forEach{f->FilterChip(selected=filter==f,onClick={filter=f},label={Text(f)},modifier=Modifier.padding(end=3.dp))}}
@@ -146,6 +148,24 @@ class MainActivity:ComponentActivity(){
     }
    }
   }
+  if(chosenProspect!=null) AlertDialog(
+   onDismissRequest={chosenProspect=null},
+   title={Text(chosenProspect!!.name)},
+   text={Column{
+    Text(chosenProspect!!.address)
+    Text("Oportunidade encontrada online • ainda não cadastrada")
+   }},
+   confirmButton={TextButton(onClick={
+    val p=chosenProspect!!
+    scope.launch{
+     dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,status="nao_visitado"))
+     prospectList=prospectList.filterNot{it.placeId==p.placeId}
+     message="Salão salvo como Não visitado."
+    }
+    chosenProspect=null
+   }){Text("Salvar como Não visitado")}},
+   dismissButton={TextButton(onClick={chosenProspect=null}){Text("Cancelar")}}
+  )
   if(quickCapture) AlertDialog(
    onDismissRequest={quickCapture=false},
    title={Text("Salvar salão encontrado")},
