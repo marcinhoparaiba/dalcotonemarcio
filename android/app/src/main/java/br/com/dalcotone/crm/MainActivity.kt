@@ -151,12 +151,21 @@ class MainActivity:ComponentActivity(){
     })
    }catch(e:Exception){message="Reconhecimento de voz não disponível neste aparelho."}
   }
+  val contactWindow=7L*24*60*60*1000
+  fun contactDays(s:Salon):Long=if(s.lastContactAt==null)7L else ((System.currentTimeMillis()-s.lastContactAt).coerceAtLeast(0L)/(24L*60*60*1000))
+  fun contactDue(s:Salon):Boolean=!s.doNotContact && s.status!="recusou" && s.status!="inativo" && (s.lastContactAt==null || System.currentTimeMillis()-s.lastContactAt>=contactWindow)
+  fun confirmContact(s:Salon){
+   scope.launch{
+    dao.saveSalon(s.copy(lastContactAt=System.currentTimeMillis()))
+    message="Contato confirmado com ${s.name}. Próximo contato em até 7 dias."
+   }
+  }
   fun leadScore(s:Salon):Int {
    var score=when(s.status){"cliente"->55;"retorno"->65;"nao_visitado"->50;"recusou"->5;"inativo"->15;else->30}
    if(s.phone.isNotBlank())score+=10
    if(s.latitude!=null&&s.longitude!=null)score+=10
-   if(s.lastContactAt==null)score+=10
-   else if(System.currentTimeMillis()-s.lastContactAt>30L*24*60*60*1000)score+=15
+   if(contactDue(s))score+=20
+   else if(contactDays(s)>=6)score+=10
    if(s.doNotContact)score=0
    return score.coerceIn(0,100)
   }
@@ -351,6 +360,19 @@ class MainActivity:ComponentActivity(){
      Text(s.city.ifBlank{"Cidade não informada"},color=Muted)
      if(s.address.isNotBlank())Text(s.address,color=Muted)
      Text("PRIORIDADE COMERCIAL  •  ${leadScore(s)}/100",color=Ruby,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
+     Text(
+      when{
+       s.doNotContact->"CONTATO BLOQUEADO"
+       s.lastContactAt==null->"SEM CONTATO REGISTRADO • PRIORIDADE"
+       contactDue(s)->"CONTATO ATRASADO • ${contactDays(s)} DIAS"
+       contactDays(s)>=6->"CONTATO VENCE EM BREVE • ${contactDays(s)} DIAS"
+       else->"CONTATO EM DIA • ${contactDays(s)} DIAS"
+      },color=if(contactDue(s))Ruby else Muted,fontWeight=FontWeight.Bold
+     )
+     Text("Próximo contato: "+(s.lastContactAt?.let{java.text.DateFormat.getDateInstance().format(java.util.Date(it+contactWindow))}?:"hoje"),color=Muted)
+     if(!s.doNotContact)OutlinedButton(onClick={confirmContact(s)},modifier=Modifier.fillMaxWidth()){
+      Text("✓ Confirmar que enviei a mensagem")
+     }
      Text("AÇÕES RÁPIDAS",color=Muted,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
      Button(onClick={openSalonWhatsapp(s)},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF168956)),shape=RoundedCornerShape(14.dp)){
       Text(if(s.phone.filter{it.isDigit()}.length>=10)"◉  Conversar pelo WhatsApp" else "＋  Adicionar WhatsApp",color=Color.White)
@@ -579,14 +601,16 @@ class MainActivity:ComponentActivity(){
      Text("Próximos compromissos",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("${appointments.count{!it.completed}} agendamentos registrados",color=Muted)
      PremiumCard{
-      Text("RETORNOS SUGERIDOS",color=Ruby,fontWeight=FontWeight.Bold)
-      val pending=salons.filter{!it.doNotContact && (it.status=="retorno" || (it.lastContactAt!=null && System.currentTimeMillis()-it.lastContactAt>30L*24*60*60*1000))}
-       .sortedByDescending{leadScore(it)}.take(4)
+      Text("CONTATOS EM ATÉ 7 DIAS",color=Ruby,fontWeight=FontWeight.Bold)
+      Text("${salons.count{contactDue(it)}} salões precisam de contato agora",color=Muted)
+      val pending=salons.filter{contactDue(it) || (!it.doNotContact && it.status=="retorno")}
+       .sortedWith(compareByDescending<Salon>{contactDue(it)}.thenByDescending{contactDays(it)}).take(20)
       if(pending.isEmpty())Text("Nenhum retorno prioritário no momento.",color=Muted)
       pending.forEach{s->
        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
         Text(s.name,Modifier.weight(1f),color=Ink,maxLines=1)
-        TextButton(onClick={selected=s}){Text("Abrir ficha")}
+        TextButton(onClick={openSalonWhatsapp(s)}){Text("WhatsApp")}
+        TextButton(onClick={selected=s}){Text("Ficha")}
        }
       }
      }
