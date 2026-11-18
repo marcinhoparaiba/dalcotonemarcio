@@ -127,8 +127,8 @@ class MainActivity:ComponentActivity(){
      if(tab=="Mapa"){
       Text("Radar comercial • 10 km",fontWeight=FontWeight.Bold)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
-      Button(onClick={captureHere},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
-      OutlinedButton(onClick={scan},modifier=Modifier.fillMaxWidth()){Text("Buscar salões próximos (online)")}
+      Button(onClick={captureHere()},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
+      OutlinedButton(onClick={scan()},modifier=Modifier.fillMaxWidth()){Text("Buscar salões próximos (online)")}
       prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
      }
      OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},modifier=Modifier.fillMaxWidth())
