@@ -7,6 +7,11 @@ import android.preference.PreferenceManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
@@ -27,6 +32,8 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
  val latestSelect by rememberUpdatedState(onSelect)
  val latestProspect by rememberUpdatedState(onProspect)
  var follow by remember{mutableStateOf(false)}
+ var allowed by remember{mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)}
+ val requestLocation=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){results->allowed=results.values.any{it};if(allowed)follow=true}
  val map=remember(context){
   Configuration.getInstance().load(context,PreferenceManager.getDefaultSharedPreferences(context))
   Configuration.getInstance().userAgentValue=context.packageName
@@ -37,12 +44,21 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
    controller.setZoom(13.5)
    controller.setCenter(GeoPoint(-7.1195,-34.8450))
    setUseDataConnection(true)
-   if(androidx.core.content.ContextCompat.checkSelfPermission(context,android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED || androidx.core.content.ContextCompat.checkSelfPermission(context,android.Manifest.permission.ACCESS_COARSE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){
-    val myLocation=MyLocationNewOverlay(GpsMyLocationProvider(context),this)
-    myLocation.enableMyLocation()
-    overlays.add(myLocation)
-   }
+
   }
+ }
+ LaunchedEffect(map,allowed,follow){
+  var loc=map.overlays.filterIsInstance<MyLocationNewOverlay>().firstOrNull()
+  if(allowed){
+   if(loc==null){loc=MyLocationNewOverlay(GpsMyLocationProvider(context),map);map.overlays.add(loc)}
+   val active=loc
+   active.enableMyLocation()
+   if(follow){
+    active.enableFollowLocation()
+    active.runOnFirstFix{map.post{active.myLocation?.let{map.controller.animateTo(it);map.controller.setZoom(16.5)}}}
+   }else active.disableFollowLocation()
+  }else{loc?.disableMyLocation();loc?.disableFollowLocation()}
+  map.invalidate()
  }
  DisposableEffect(map){map.onResume();onDispose{map.overlays.filterIsInstance<MyLocationNewOverlay>().forEach{it.disableFollowLocation();it.disableMyLocation()};map.onPause();map.onDetach()}}
  Box(modifier=modifier.fillMaxWidth()){
@@ -76,10 +92,10 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   view.invalidate()
  })
  FloatingActionButton(onClick={
-  map.overlays.filterIsInstance<MyLocationNewOverlay>().firstOrNull()?.let{overlay->
-   follow=!follow
-   if(follow){overlay.enableFollowLocation();overlay.myLocation?.let{map.controller.animateTo(it)}}else overlay.disableFollowLocation()
-  }
- },modifier=Modifier.align(Alignment.BottomEnd).padding(12.dp)){Text(if(follow)"● GPS" else "◎ GPS")}
+  if(!allowed)requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
+  else follow=!follow
+ },shape=CircleShape,containerColor=Color(0xFF9D1026),contentColor=Color.White,modifier=Modifier.align(Alignment.BottomEnd).padding(16.dp)){
+  Text(if(follow)"◎" else "⌖",style=androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+ }
  }
 }
