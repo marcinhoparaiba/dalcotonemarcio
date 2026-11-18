@@ -11,6 +11,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -78,6 +83,12 @@ class MainActivity:ComponentActivity(){
   val osm=remember{OpenStreetMapRepository()}
   val cnpjLookup=remember{CnpjLookupRepository()}
   val money=remember{NumberFormat.getCurrencyInstance(Locale("pt","BR"))}
+  fun whatsapp(raw:String){
+   val digits=raw.filter{it.isDigit()}
+   val international=when{digits.length==10||digits.length==11->"55"+digits;digits.length in 12..13&&digits.startsWith("55")->digits;else->""}
+   if(international.isBlank()){message="Número inválido para WhatsApp. Confira o DDD.";return}
+   startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+international)))
+  }
   fun navigate(s:Salon){val q=Uri.encode(listOf(s.address,s.city,"Paraíba Brasil").joinToString(" "));startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))}
   fun captureHere(){
    if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
@@ -134,7 +145,7 @@ class MainActivity:ComponentActivity(){
     Text(s.name,style=MaterialTheme.typography.titleLarge)
     Text("${s.city} • ${s.status}")
     Text(s.address)
-    Row{TextButton(onClick={navigate(s)}){Text("Abrir rota")};TextButton(onClick={if(s.phone.isNotBlank())startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+s.phone.filter{it.isDigit()})))}){Text("WhatsApp")}}
+    Row{TextButton(onClick={navigate(s)}){Text("Abrir rota")};TextButton(onClick={if(s.phone.isNotBlank())whatsapp(s.phone)}){Text("WhatsApp")}}
     val ownSales=sales.filter{it.salonId==s.id}
     val outstanding=ownSales.sumOf{sale->sale.totalCents-payments.filter{it.saleId==sale.id}.sumOf{it.amountCents}}
     Text("Saldo a receber: ${money.format(outstanding/100.0)}",fontWeight=FontWeight.Bold,color=Ruby)
@@ -156,7 +167,13 @@ class MainActivity:ComponentActivity(){
    }else when(tab){
     "Mapa","Clientes"->{
      if(tab=="Mapa"){
-      Text("Radar comercial • 10 km",fontWeight=FontWeight.Bold)
+      Surface(color=Color(0xFFF9F2F3),shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()){
+       Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+        Text("RADAR DE OPORTUNIDADES",color=Ruby,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium)
+        Text("${prospectList.size} salões para prospectar",fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
+        Text("Explore o mapa, abra um salão e entre em contato.",style=MaterialTheme.typography.bodySmall)
+       }
+      }
       SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxWidth().height(340.dp))
       Text("Mapa OpenStreetMap: ruas precisam de internet na primeira visualização; pontos cadastrados ficam salvos offline.",style=MaterialTheme.typography.bodySmall)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
@@ -167,7 +184,7 @@ class MainActivity:ComponentActivity(){
       Text("Fontes: Google Places e OpenStreetMap para descoberta; Receita/CNPJ para consulta pontual; CRM SQLite para visitas e clientes.",style=MaterialTheme.typography.bodySmall)
       Text("Oportunidades encontradas: ${prospectList.size} • salve para acompanhar como Não visitado",style=MaterialTheme.typography.bodySmall)
       prospectList.take(20).forEach{p->
-       Card(onClick={chosenProspect=p;prospectPhotoUrl=null},modifier=Modifier.fillMaxWidth().padding(vertical=5.dp)){
+       Card(onClick={chosenProspect=p;prospectPhotoUrl=null},shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFF9F9FA)),elevation=CardDefaults.cardElevation(defaultElevation=2.dp),modifier=Modifier.fillMaxWidth().padding(vertical=5.dp)){
         Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
          Surface(color=Color(0xFFF3E9EA),shape=RoundedCornerShape(10.dp),modifier=Modifier.size(72.dp)){
           Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("✂",style=MaterialTheme.typography.headlineMedium,color=Ruby)}
@@ -228,7 +245,14 @@ class MainActivity:ComponentActivity(){
       finally{detailsLoading=false}
      }
     }){Text("Consultar telefone e foto (Google • pode gerar cobrança)")}
-    chosenProspect!!.phone?.takeIf{it.isNotBlank()}?.let{tel->TextButton(onClick={startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+tel.filter{it.isDigit()})))}){Text("Ligar")}}
+    chosenProspect!!.phone?.takeIf{it.isNotBlank()}?.let{tel->Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+     Button(onClick={whatsapp(tel)}){Text("WhatsApp")}
+     OutlinedButton(onClick={startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+tel.filter{it.isDigit()})))}){Text("Ligar")}
+    }}
+    chosenProspect!!.let{p->TextButton(onClick={
+     val query=Uri.encode(if(p.latitude!=null&&p.longitude!=null)"${p.latitude},${p.longitude}" else p.address)
+     startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/maps/search/?api=1&query="+query)))
+    }){Text("Traçar rota")}}
     Text("Oportunidade encontrada online • ainda não cadastrada")
    }},
    confirmButton={TextButton(onClick={
