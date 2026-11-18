@@ -13,6 +13,8 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 
 /** OpenStreetMap tiles online with local tile cache; saved pins remain in Room offline. */
 @Composable
@@ -26,9 +28,15 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   MapView(context).apply{
    setTileSource(TileSourceFactory.MAPNIK)
    setMultiTouchControls(true)
+   zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
    controller.setZoom(13.5)
    controller.setCenter(GeoPoint(-7.1195,-34.8450))
    setUseDataConnection(true)
+   if(androidx.core.content.ContextCompat.checkSelfPermission(context,android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED || androidx.core.content.ContextCompat.checkSelfPermission(context,android.Manifest.permission.ACCESS_COARSE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){
+    val myLocation=MyLocationNewOverlay(GpsMyLocationProvider(context),this)
+    myLocation.enableMyLocation()
+    overlays.add(myLocation)
+   }
   }
  }
  DisposableEffect(map){map.onResume();onDispose{map.onPause();map.onDetach()}}
