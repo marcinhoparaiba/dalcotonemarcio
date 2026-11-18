@@ -35,7 +35,7 @@ data class Payment(@PrimaryKey val id:String=java.util.UUID.randomUUID().toStrin
     @Query("SELECT * FROM payments ORDER BY paidAt DESC") fun payments():Flow<List<Payment>>
     @Query("SELECT * FROM sale_items ORDER BY product") fun items():Flow<List<SaleItem>>
     @Query("SELECT * FROM visits ORDER BY visitedAt DESC") fun visits():Flow<List<Visit>>
-    @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun saveSalon(s:Salon)
+    @Upsert suspend fun saveSalon(s:Salon)
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun saveDiscoveredSalon(s:Salon):Long
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun restoreVisit(v:Visit)
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun restoreAppointment(a:Appointment)
