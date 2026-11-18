@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,6 +65,8 @@ class MainActivity:ComponentActivity(){
   var paymentMethod by remember{mutableStateOf("pix")}
   var prospectList by remember{mutableStateOf<List<Prospect>>(emptyList())}
   var chosenProspect by remember{mutableStateOf<Prospect?>(null)}
+  var prospectPhotoUrl by remember{mutableStateOf<String?>(null)}
+  var detailsLoading by remember{mutableStateOf(false)}
   var cnpjDialog by remember{mutableStateOf(false)}
   var cnpjText by remember{mutableStateOf("")}
   var cnpjResult by remember{mutableStateOf<CnpjBusiness?>(null)}
@@ -162,7 +166,20 @@ class MainActivity:ComponentActivity(){
       TextButton(onClick={cnpjDialog=true}){Text("Consultar CNPJ de um salão (online)")}
       Text("Fontes: Google Places e OpenStreetMap para descoberta; Receita/CNPJ para consulta pontual; CRM SQLite para visitas e clientes.",style=MaterialTheme.typography.bodySmall)
       Text("Oportunidades encontradas: ${prospectList.size} • salve para acompanhar como Não visitado",style=MaterialTheme.typography.bodySmall)
-      prospectList.take(20).forEach{p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(p.name,Modifier.weight(1f));TextButton(onClick={scope.launch{dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,status="nao_visitado"));prospectList=prospectList.filterNot{it.placeId==p.placeId}}}){Text("Salvar")}}}
+      prospectList.take(20).forEach{p->
+       Card(onClick={chosenProspect=p;prospectPhotoUrl=null},modifier=Modifier.fillMaxWidth().padding(vertical=5.dp)){
+        Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
+         Surface(color=Color(0xFFF3E9EA),shape=RoundedCornerShape(10.dp),modifier=Modifier.size(72.dp)){
+          Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("✂",style=MaterialTheme.typography.headlineMedium,color=Ruby)}
+         }
+         Column(Modifier.weight(1f)){
+          Text(p.name,fontWeight=FontWeight.Bold)
+          Text(p.address.ifBlank{"Endereço não informado"},style=MaterialTheme.typography.bodySmall)
+          Text("Não visitado • Toque para detalhes",style=MaterialTheme.typography.bodySmall,color=Ruby)
+         }
+        }
+       }
+      }
      }
      OutlinedTextField(search,{search=it},label={Text("Buscar salão ou cidade")},modifier=Modifier.fillMaxWidth())
      Row{listOf("todos","cliente","retorno","nao_visitado").forEach{f->FilterChip(selected=filter==f,onClick={filter=f},label={Text(f)},modifier=Modifier.padding(end=3.dp))}}
@@ -196,14 +213,28 @@ class MainActivity:ComponentActivity(){
   if(chosenProspect!=null) AlertDialog(
    onDismissRequest={chosenProspect=null},
    title={Text(chosenProspect!!.name)},
-   text={Column{
+   text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    if(prospectPhotoUrl!=null)AsyncImage(model=prospectPhotoUrl,contentDescription="Foto do estabelecimento fornecida pelo Google",modifier=Modifier.fillMaxWidth().height(150.dp),contentScale=ContentScale.Crop)
     Text(chosenProspect!!.address)
+    Text(chosenProspect!!.phone?.let{"Telefone: $it"}?:"Telefone não consultado ou indisponível")
+    if(detailsLoading)CircularProgressIndicator()
+    if(chosenProspect!!.placeId.startsWith("osm:"))Text("Fonte OpenStreetMap: telefone e foto podem não estar disponíveis.")
+    else TextButton(enabled=!detailsLoading,onClick={
+     val p=chosenProspect!!
+     scope.launch{
+      detailsLoading=true
+      try{val detail=places.details(p);chosenProspect=detail;prospectPhotoUrl=detail.photoName?.let{places.photoUrl(it)}}
+      catch(e:Exception){message=e.message?:"Detalhes indisponíveis"}
+      finally{detailsLoading=false}
+     }
+    }){Text("Consultar telefone e foto (Google • pode gerar cobrança)")}
+    chosenProspect!!.phone?.takeIf{it.isNotBlank()}?.let{tel->TextButton(onClick={startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+tel.filter{it.isDigit()})))}){Text("Ligar")}}
     Text("Oportunidade encontrada online • ainda não cadastrada")
    }},
    confirmButton={TextButton(onClick={
     val p=chosenProspect!!
     scope.launch{
-     dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,status="nao_visitado"))
+     dao.saveSalon(Salon(name=p.name,address=p.address,placeId=p.placeId,latitude=p.latitude,longitude=p.longitude,phone=p.phone?:"",status="nao_visitado"))
      prospectList=prospectList.filterNot{it.placeId==p.placeId}
      message="Salão salvo como Não visitado."
     }
