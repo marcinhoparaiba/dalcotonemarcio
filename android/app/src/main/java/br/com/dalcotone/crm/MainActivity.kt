@@ -18,6 +18,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
@@ -63,6 +64,7 @@ class MainActivity:ComponentActivity(){
   var routeAll by remember{mutableStateOf(true)}
   var routeSelectedIds by remember{mutableStateOf<Set<String>>(emptySet())}
   var routeBatch by remember{mutableIntStateOf(0)}
+  var routeCity by remember{mutableStateOf<String?>(null)}
   var cityFilter by remember{mutableStateOf("todos")}
   var editOutcome by remember{mutableStateOf(false)}
   var outcome by remember{mutableStateOf("cliente")}
@@ -290,8 +292,15 @@ class MainActivity:ComponentActivity(){
       FilterChip(selected=routeAll,onClick={routeAll=true},label={Text("ROTA TOTAL")})
       FilterChip(selected=!routeAll,onClick={routeAll=false},label={Text("Selecionar paradas")})
      }
-     Text("Rota total reúne clientes cadastrados na carteira. Confirme a localização antes de viajar.",style=MaterialTheme.typography.bodySmall)
-     val chosen=if(routeAll)geolocated else geolocated.filter{it.id in routeSelectedIds}
+     Text("Selecione uma cidade ou use todas as cidades. Dentro dela, escolha todos ou apenas alguns clientes.",style=MaterialTheme.typography.bodySmall)
+     val routeCities=customers.map{it.city.trim().ifBlank{"Cidade não informada"}}.distinct().sorted()
+     Text("Cidades",fontWeight=FontWeight.Bold)
+     LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+      item{FilterChip(selected=routeCity==null,onClick={routeCity=null},label={Text("Toda Paraíba")})}
+      items(routeCities){town->FilterChip(selected=routeCity==town,onClick={routeCity=town},label={Text(town)})}
+     }
+     val inCity=geolocated.filter{routeCity==null||it.city.trim().ifBlank{"Cidade não informada"}==routeCity}
+     val chosen=if(routeAll)inCity else inCity.filter{it.id in routeSelectedIds}
      val ordered=remember(chosen){routeOrder(chosen)}
      Text("${ordered.size} paradas • ${(ordered.size+7)/8} etapa(s)",style=MaterialTheme.typography.bodyMedium)
      Text("Sequência preliminar por proximidade geográfica. O tempo real e as ruas são calculados pelo Google Maps após abrir cada etapa.",style=MaterialTheme.typography.bodySmall)
@@ -307,7 +316,7 @@ class MainActivity:ComponentActivity(){
       }
      }
      LazyColumn{
-      items(customers.sortedWith(compareBy({it.city},{it.name}))){s->
+      items(customers.filter{routeCity==null||it.city.trim().ifBlank{"Cidade não informada"}==routeCity}.sortedWith(compareBy({it.city},{it.name}))){s->
        Row(Modifier.fillMaxWidth().padding(vertical=6.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
         if(!routeAll)Checkbox(checked=s.id in routeSelectedIds,onCheckedChange={checked->routeSelectedIds=if(checked)routeSelectedIds+s.id else routeSelectedIds-s.id})
         Column(Modifier.weight(1f)){
