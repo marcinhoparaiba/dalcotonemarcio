@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.drawable.BitmapDrawable
 import android.content.Context
 import android.content.pm.PackageManager
@@ -91,6 +93,12 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   Configuration.getInstance().userAgentValue=context.packageName
   MapView(context).apply{
    setTileSource(TileSourceFactory.MAPNIK)
+   overlayManager.tilesOverlay.setColorFilter(ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
+    -0.68f,0f,0f,0f,206f,
+    0f,-0.68f,0f,0f,209f,
+    0f,0f,-0.68f,0f,220f,
+    0f,0f,0f,1f,0f
+   ))))
    setMultiTouchControls(true)
    zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
    controller.setZoom(13.5)
@@ -151,7 +159,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
  FloatingActionButton(onClick={
   if(!allowed)requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
   else follow=!follow
- },shape=CircleShape,containerColor=Color(0xFF9D1026),contentColor=Color.White,modifier=Modifier.align(Alignment.BottomEnd).padding(16.dp)){
+ },shape=CircleShape,containerColor=Color(0xFFCA1737),contentColor=Color.White,modifier=Modifier.align(Alignment.BottomEnd).padding(16.dp)){
   Text(if(follow)"◎" else "⌖",style=androidx.compose.material3.MaterialTheme.typography.headlineMedium)
  }
  }
