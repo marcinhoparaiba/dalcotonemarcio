@@ -165,7 +165,7 @@ class MainActivity:ComponentActivity(){
    }catch(e:SecurityException){message="Permissão de localização necessária."}
   }
   fun cityFromAddress(address:String):String {
-   val match=Regex("""(?:^|,\\s*)([^,]+?)\\s*-\\s*[A-Z]{2}(?:,|\\s*-\\s*Brasil|$)""").findAll(address).lastOrNull()
+   val match=Regex("""(?:^|,\s*)([^,]+?)\s*-\s*[A-Z]{2}(?:,|\s*-\s*Brasil|$)""").findAll(address).lastOrNull()
    return match?.groupValues?.get(1)?.trim()?.substringAfterLast(",")?.trim().orEmpty()
   }
   suspend fun persistDiscovery(found:List<Prospect>):Int {
