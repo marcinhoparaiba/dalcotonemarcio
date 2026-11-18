@@ -1,6 +1,10 @@
 package br.com.dalcotone.crm
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import android.content.Context
 import android.content.pm.PackageManager
 import android.preference.PreferenceManager
@@ -25,6 +29,21 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 
+private fun pin(context:Context,color:Int):BitmapDrawable{
+ val d=context.resources.displayMetrics.density
+ val size=(52*d).toInt().coerceAtLeast(52)
+ val bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
+ val canvas=Canvas(bitmap)
+ val p=Paint(Paint.ANTI_ALIAS_FLAG)
+ p.color=color
+ canvas.drawCircle(size/2f,size*0.43f,size*0.37f,p)
+ p.color=android.graphics.Color.WHITE
+ p.textAlign=Paint.Align.CENTER
+ p.textSize=size*0.43f
+ p.typeface=android.graphics.Typeface.DEFAULT_BOLD
+ canvas.drawText("✂",size/2f,size*0.56f,p)
+ return BitmapDrawable(context.resources,bitmap)
+}
 /** OpenStreetMap tiles online with local tile cache; saved pins remain in Room offline. */
 @Composable
 fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:(Salon)->Unit,onProspect:(Prospect)->Unit = {},modifier:Modifier=Modifier,center:GeoPoint?=null){
@@ -34,6 +53,9 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
  var follow by remember{mutableStateOf(false)}
  var allowed by remember{mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)}
  val requestLocation=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){results->allowed=results.values.any{it};if(allowed)follow=true}
+ val ruby=remember(context){pin(context,0xFF9D1026.toInt())}
+ val green=remember(context){pin(context,0xFF168956.toInt())}
+ val orange=remember(context){pin(context,0xFFE28A20.toInt())}
  val map=remember(context){
   Configuration.getInstance().load(context,PreferenceManager.getDefaultSharedPreferences(context))
   Configuration.getInstance().userAgentValue=context.packageName
@@ -67,6 +89,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   salons.filter{it.latitude!=null&&it.longitude!=null}.forEach{s->
    val marker=Marker(view).apply{
     position=GeoPoint(s.latitude!!,s.longitude!!)
+    icon=when(s.status){"cliente"->green;"retorno"->orange;else->ruby}
     title=s.name
     snippet=if(s.status=="nao_visitado")"Não visitado" else s.status
     setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM)
@@ -77,6 +100,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   prospects.filter{it.latitude!=null&&it.longitude!=null}.forEach{p->
    val marker=Marker(view).apply{
     position=GeoPoint(p.latitude!!,p.longitude!!)
+    icon=ruby
     title=p.name
     snippet="Oportunidade • toque para cadastrar"
     setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM)
