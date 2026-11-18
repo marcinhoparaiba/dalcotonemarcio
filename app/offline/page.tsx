@@ -1,0 +1,1 @@
+export default function Offline(){return <main style={{fontFamily:"Arial",maxWidth:500,margin:"15vh auto",padding:24}}><h1 style={{color:"#9b111e"}}>Dal Cotone CRM</h1><h2>Sem conexão</h2><p>Reconecte-se à internet para consultar o mapa e sincronizar informações. Não registre dados sensíveis em dispositivos compartilhados.</p><a href="/">Tentar novamente</a></main>}
