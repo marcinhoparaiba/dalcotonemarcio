@@ -110,6 +110,7 @@ class MainActivity:ComponentActivity(){
   var cnpjText by remember{mutableStateOf("")}
   var cnpjResult by remember{mutableStateOf<CnpjBusiness?>(null)}
   var searching by remember{mutableStateOf(false)}
+  var enrichingPhones by remember{mutableStateOf(false)}
   val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationManager=remember{getSystemService(LOCATION_SERVICE) as android.location.LocationManager}
@@ -291,6 +292,36 @@ class MainActivity:ComponentActivity(){
     }
    }
    return saved
+  }
+  fun enrichPublicPhones(){
+   if(enrichingPhones || searching)return
+   if(BuildConfig.PLACES_API_KEY.isBlank()){
+    message="Configure a chave Google Places para consultar telefones públicos."
+    return
+   }
+   val candidates=salons.filter{it.phone.isBlank() && !it.placeId.isNullOrBlank() && !it.placeId!!.startsWith("osm:")}
+   if(candidates.isEmpty()){message="Nenhum salão do Google sem telefone para consultar.";return}
+   scope.launch{
+    enrichingPhones=true
+    var updated=0
+    var unavailable=0
+    try{
+     candidates.forEach{s->
+      try{
+       val detail=places.details(Prospect(s.placeId!!,s.name,s.address,s.latitude,s.longitude))
+       val phone=detail.phone?.trim().orEmpty()
+       if(phone.isNotBlank()){
+        val current=salons.firstOrNull{it.id==s.id}
+        if(current!=null && current.phone.isBlank()){
+         dao.saveSalon(current.copy(phone=phone))
+         updated++
+        }
+       }else unavailable++
+      }catch(e:Exception){unavailable++}
+     }
+     message="Telefones públicos: $updated preenchidos; $unavailable indisponíveis ou com falha. Verifique os números antes de usar no WhatsApp."
+    }finally{enrichingPhones=false}
+   }
   }
   fun scan(){
    if(searching)return
@@ -667,7 +698,12 @@ class MainActivity:ComponentActivity(){
       }
      }
      PremiumCard{
-      Text("CLIENTES ATENDIDOS • CONTATO A CADA 7 DIAS",color=Ruby,fontWeight=FontWeight.Bold)
+      Text("ENRIQUECIMENTO DE TELEFONES",color=Ruby,fontWeight=FontWeight.Bold)
+     Text("Consulta números comerciais públicos dos salões encontrados no Google. Pode gerar custos na API.",color=Muted)
+     Button(onClick={enrichPublicPhones()},enabled=!enrichingPhones && !searching,modifier=Modifier.fillMaxWidth()){
+      Text(if(enrichingPhones)"Consultando telefones..." else "Buscar telefones públicos que faltam")
+     }
+     Text("CLIENTES ATENDIDOS • CONTATO A CADA 7 DIAS",color=Ruby,fontWeight=FontWeight.Bold)
       Text("${salons.count{contactDue(it)}} salões precisam de contato agora",color=Muted)
       val pending=salons.filter{contactDue(it)}
        .sortedWith(compareByDescending<Salon>{contactDue(it)}.thenByDescending{contactDays(it)}).take(20)
