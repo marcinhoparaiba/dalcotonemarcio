@@ -126,6 +126,8 @@ class MainActivity:ComponentActivity(){
     "Mapa","Clientes"->{
      if(tab=="Mapa"){
       Text("Radar comercial • 10 km",fontWeight=FontWeight.Bold)
+      SalonMap(salons=salons,onSelect={selected=it},modifier=Modifier.fillMaxWidth().height(340.dp))
+      Text("Mapa OpenStreetMap: ruas precisam de internet na primeira visualização; pontos cadastrados ficam salvos offline.",style=MaterialTheme.typography.bodySmall)
       Text("Clientes salvos funcionam offline. Novos salões exigem internet.",style=MaterialTheme.typography.bodySmall)
       Button(onClick={captureHere()},modifier=Modifier.fillMaxWidth()){Text("📍 Salvar salão aqui (GPS offline)")}
       OutlinedButton(onClick={scan()},modifier=Modifier.fillMaxWidth()){Text("Buscar salões próximos (online)")}
