@@ -4,7 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.preference.PreferenceManager
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -22,6 +26,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
  val context=androidx.compose.ui.platform.LocalContext.current
  val latestSelect by rememberUpdatedState(onSelect)
  val latestProspect by rememberUpdatedState(onProspect)
+ var follow by remember{mutableStateOf(false)}
  val map=remember(context){
   Configuration.getInstance().load(context,PreferenceManager.getDefaultSharedPreferences(context))
   Configuration.getInstance().userAgentValue=context.packageName
@@ -39,8 +44,9 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
    }
   }
  }
- DisposableEffect(map){map.onResume();onDispose{map.onPause();map.onDetach()}}
- AndroidView(factory={map},modifier=modifier.fillMaxWidth(),update={view->
+ DisposableEffect(map){map.onResume();onDispose{map.overlays.filterIsInstance<MyLocationNewOverlay>().forEach{it.disableFollowLocation();it.disableMyLocation()};map.onPause();map.onDetach()}}
+ Box(modifier=modifier.fillMaxWidth()){
+ AndroidView(factory={map},modifier=Modifier.fillMaxSize(),update={view->
   view.overlays.filterIsInstance<Marker>().toList().forEach{view.overlays.remove(it)}
   salons.filter{it.latitude!=null&&it.longitude!=null}.forEach{s->
    val marker=Marker(view).apply{
@@ -69,4 +75,11 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
   }
   view.invalidate()
  })
+ FloatingActionButton(onClick={
+  map.overlays.filterIsInstance<MyLocationNewOverlay>().firstOrNull()?.let{overlay->
+   follow=!follow
+   if(follow){overlay.enableFollowLocation();overlay.myLocation?.let{map.controller.animateTo(it)}}else overlay.disableFollowLocation()
+  }
+ },modifier=Modifier.align(Alignment.BottomEnd).padding(12.dp)){Text(if(follow)"● GPS" else "◎ GPS")}
+ }
 }
