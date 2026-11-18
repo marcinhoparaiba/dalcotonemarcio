@@ -112,12 +112,26 @@ class MainActivity:ComponentActivity(){
   val money=remember{NumberFormat.getCurrencyInstance(Locale("pt","BR"))}
   fun whatsapp(raw:String){
    val digits=raw.filter{it.isDigit()}
-   val international=when{digits.length==10||digits.length==11->"55"+digits;digits.length in 12..13&&digits.startsWith("55")->digits;else->""}
+   val international=when{
+    digits.length in 12..13&&digits.startsWith("55")->digits
+    digits.length in 10..11->"55"+digits
+    else->""
+   }
    if(international.isBlank()){message="Número inválido para WhatsApp. Confira o DDD.";return}
-   startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+international)))
+   val uri=Uri.parse("https://wa.me/$international")
+   try{
+    startActivity(Intent(Intent.ACTION_VIEW,uri).apply{
+     addCategory(Intent.CATEGORY_BROWSABLE)
+    })
+   }catch(e:android.content.ActivityNotFoundException){
+    message="Não foi possível abrir o WhatsApp neste aparelho."
+   }catch(e:SecurityException){
+    message="O Android bloqueou a abertura da conversa."
+   }
   }
   fun openSalonWhatsapp(s:Salon){
-   if(s.phone.filter{it.isDigit()}.length<10){
+   val digits=s.phone.filter{it.isDigit()}
+   if(digits.length !in 10..11 && !(digits.length in 12..13 && digits.startsWith("55"))){
     phoneDraft=s.phone
     phoneEditor=s
     return
