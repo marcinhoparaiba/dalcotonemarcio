@@ -73,13 +73,19 @@ private fun gpsDot(context:Context):BitmapDrawable{
  canvas.drawCircle(c,c,size*0.22f,p)
  return BitmapDrawable(context.resources,bmp)
 }
+class SalonMapSession {
+ var latitude:Double?=null
+ var longitude:Double?=null
+ var zoom:Double=16.0
+ var followLocation:Boolean=true
+}
 /** OpenStreetMap tiles online with local tile cache; saved pins remain in Room offline. */
 @Composable
-fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:(Salon)->Unit,onProspect:(Prospect)->Unit = {},modifier:Modifier=Modifier,center:GeoPoint?=null){
+fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:(Salon)->Unit,onProspect:(Prospect)->Unit = {},modifier:Modifier=Modifier,center:GeoPoint?=null,session:SalonMapSession=remember{SalonMapSession()}){
  val context=androidx.compose.ui.platform.LocalContext.current
  val latestSelect by rememberUpdatedState(onSelect)
  val latestProspect by rememberUpdatedState(onProspect)
- var follow by remember{mutableStateOf(false)}
+ var follow by remember{mutableStateOf(session.followLocation)}
  var allowed by remember{mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)}
  val requestLocation=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){results->allowed=results.values.any{it};if(allowed)follow=true}
  val blueLocation=remember(context){gpsDot(context)}
@@ -94,8 +100,8 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
    // Standard tile rendering until the dark-map filter is verified on devices.
    setMultiTouchControls(true)
    zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
-   controller.setZoom(13.5)
-   controller.setCenter(GeoPoint(-7.1195,-34.8450))
+   controller.setZoom(session.zoom)
+   controller.setCenter(if(session.latitude!=null&&session.longitude!=null)GeoPoint(session.latitude!!,session.longitude!!) else GeoPoint(-7.1195,-34.8450))
    setUseDataConnection(true)
    setTilesScaledToDpi(true)
 
@@ -111,12 +117,26 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
    active.enableMyLocation()
    if(follow){
     active.enableFollowLocation()
-    active.runOnFirstFix{map.post{active.myLocation?.let{map.controller.animateTo(it);map.controller.setZoom(16.5)}}}
+    active.runOnFirstFix{map.post{
+     active.myLocation?.let{
+      map.controller.animateTo(it)
+      map.controller.setZoom(16.5)
+      session.latitude=it.latitude
+      session.longitude=it.longitude
+      session.zoom=16.5
+     }
+    }}
    }else active.disableFollowLocation()
   }else{loc?.disableMyLocation();loc?.disableFollowLocation()}
   map.invalidate()
  }
- DisposableEffect(map){map.onResume();onDispose{map.overlays.filterIsInstance<MyLocationNewOverlay>().forEach{it.disableFollowLocation();it.disableMyLocation()};map.onPause();map.onDetach()}}
+ DisposableEffect(map){map.onResume();onDispose{
+  val current=map.mapCenter
+  session.latitude=current.latitude
+  session.longitude=current.longitude
+  session.zoom=map.zoomLevelDouble
+  session.followLocation=follow
+  map.overlays.filterIsInstance<MyLocationNewOverlay>().forEach{it.disableFollowLocation();it.disableMyLocation()};map.onPause();map.onDetach()}}
  Box(modifier=modifier.fillMaxWidth()){
  AndroidView(factory={map},modifier=Modifier.fillMaxSize(),update={view->
   view.overlays.filterIsInstance<Marker>().toList().forEach{view.overlays.remove(it)}
@@ -151,7 +171,7 @@ fun SalonMap(salons:List<Salon>,prospects:List<Prospect> = emptyList(),onSelect:
  })
  FloatingActionButton(onClick={
   if(!allowed)requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
-  else follow=!follow
+  else {follow=!follow;session.followLocation=follow}
  },shape=CircleShape,containerColor=Color(0xFFCA1737),contentColor=Color.White,modifier=Modifier.align(Alignment.BottomEnd).padding(16.dp)){
   Text(if(follow)"◎" else "⌖",style=androidx.compose.material3.MaterialTheme.typography.headlineMedium)
  }
