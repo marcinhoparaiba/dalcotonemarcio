@@ -428,6 +428,7 @@ class MainActivity:ComponentActivity(){
      else listOf(Color(0xFF0B0B11),Color(0xFF18111A),Color(0xFF230B14))
     )
    ))
+   ApprovedArtworkBackground(panel=when(tab){"Início"->0;"Mapa"->1;"Clientes"->2;else->3},modifier=Modifier.fillMaxSize())
    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Ink){
    Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
    Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
