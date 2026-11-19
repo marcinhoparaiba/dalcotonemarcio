@@ -1,6 +1,20 @@
 package br.com.dalcotone.crm
 
 import android.Manifest
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawImage
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.scale
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -11,6 +25,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,6 +52,30 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import java.text.NumberFormat
 import java.util.Locale
+
+
+// Uses the unchanged approved 1536x865 four-panel artwork, if bundled in assets.
+// Each of the four equal-width panels is displayed without recoloring or redrawing.
+@Composable private fun ApprovedArtworkBackground(panel:Int,modifier:Modifier=Modifier){
+ val context=LocalContext.current
+ val artwork=remember{
+  runCatching{
+   context.assets.open("dalcotone-four-panels.png").use{BitmapFactory.decodeStream(it).asImageBitmap()}
+  }.getOrNull()
+ }
+ if(artwork!=null){
+  Canvas(modifier){
+   val segmentWidth=artwork.width/4
+   drawImage(
+    image=artwork,
+    srcOffset=IntOffset(segmentWidth*panel.coerceIn(0,3),0),
+    srcSize=IntSize(segmentWidth,artwork.height),
+    dstOffset=IntOffset.Zero,
+    dstSize=IntSize(size.width.toInt().coerceAtLeast(1),size.height.toInt().coerceAtLeast(1))
+   )
+  }
+ }
+}
 
 private val Ruby=Color(0xFFCA1737)
 private val Ink=Color(0xFFF8F5F7)
