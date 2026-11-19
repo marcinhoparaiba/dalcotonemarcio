@@ -525,7 +525,7 @@ class MainActivity:ComponentActivity(){
     "Início"->{
      ArtworkHome(
       salons=salons.size,
-      contacts=visits.count{it.visitedAt>=System.currentTimeMillis()-7L*24*60*60*1000},
+      contacts=salons.count{s->s.lastContactAt?.let{it>=System.currentTimeMillis()-7L*24*60*60*1000}==true},
       appointments=appointments.count{!it.completed && it.startsAt>=System.currentTimeMillis()},
       onNavigate={destination->tab=destination;selected=null;message=""}
      )
