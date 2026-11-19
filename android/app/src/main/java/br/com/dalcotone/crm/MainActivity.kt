@@ -714,7 +714,7 @@ class MainActivity:ComponentActivity(){
        }
        Text("${salons.size} salões salvos  •  ${salons.count{it.status=="cliente"}} clientes",color=Muted,style=MaterialTheme.typography.bodySmall)
       }
-      Surface(shape=RoundedCornerShape(24.dp),color=Color(0xFFE8EBED),modifier=Modifier.fillMaxWidth().height(440.dp)){
+      Surface(shape=RoundedCornerShape(24.dp),color=Color(0xFFE8EBED),modifier=Modifier.fillMaxWidth().height(310.dp)){
        SalonMap(salons=salons,prospects=prospectList,onSelect={selected=it},onProspect={chosenProspect=it},modifier=Modifier.fillMaxSize(),session=mapSession)
       }
       Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()){
