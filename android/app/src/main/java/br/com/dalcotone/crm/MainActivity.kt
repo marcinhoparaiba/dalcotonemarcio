@@ -429,7 +429,7 @@ class MainActivity:ComponentActivity(){
    ApprovedArtworkBackground(panel=when(tab){"Início"->0;"Mapa"->1;"Clientes"->2;else->3},modifier=Modifier.fillMaxSize())
    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Ink){
    Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
+   if(tab!="Início") Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
      Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
       Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("DC",color=Color.White,fontWeight=FontWeight.ExtraBold)}
@@ -446,7 +446,7 @@ class MainActivity:ComponentActivity(){
     }
    }
    val navigationItems=listOf("Início" to "⌂","Mapa" to "◉","Cidades" to "⌖","Clientes" to "♙","Rota" to "➤","Agenda" to "▦","Financeiro" to "R$")
-   LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
+   if(tab!="Início") LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
     items(navigationItems){(target,symbol)->
      val active=tab==target
      Surface(onClick={tab=target;selected=null;message=""},shape=RoundedCornerShape(15.dp),
@@ -530,34 +530,24 @@ class MainActivity:ComponentActivity(){
     }}
    }else when(tab){
     "Início"->{
-     Surface(shape=RoundedCornerShape(22.dp),color=Color(0xFF3B0C1B),modifier=Modifier.fillMaxWidth()){
-      Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
-       Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)){
-        Text("DALCOTONE PROFESSIONAL",color=Color(0xFFFF889A),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
-        Text("Mais do que produtos, resultado para os salões!",color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.ExtraBold)
-        Text("Controle, captação e relacionamento em um só lugar.",color=Muted,style=MaterialTheme.typography.bodySmall)
-       }
-       Text("DC",color=Color(0xFFFF3B59),style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Black)
+     BoxWithConstraints(Modifier.fillMaxWidth().height(720.dp)){
+      ApprovedArtworkBackground(panel=0,modifier=Modifier.fillMaxSize())
+      val cellWidth=maxWidth/3
+      val rowHeight=104.dp
+      listOf(
+       Triple("Mapa",0,0),Triple("Rota",1,0),Triple("Clientes",2,0),
+       Triple("Financeiro",0,1),Triple("Clientes",1,1),Triple("Financeiro",2,1)
+      ).forEach{(destination,column,row)->
+       Box(Modifier.offset(x=cellWidth*column,y=255.dp+rowHeight*row)
+        .width(cellWidth).height(rowHeight).clickable{tab=destination})
       }
-     }
-     val shortcuts=listOf(Triple("Rastrear Salões","Mapa","◉"),Triple("Rotas","Rota","➤"),Triple("Clientes","Clientes","♙"),Triple("Cobranças","Financeiro","R$"),Triple("Contato Automático","Clientes","✉"),Triple("Relatórios","Financeiro","▦"))
-     shortcuts.chunked(3).forEachIndexed{rowIndex,row->
-      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(9.dp)){
-       row.forEachIndexed{index,item->
-        Surface(onClick={tab=item.second},modifier=Modifier.weight(1f).height(112.dp),shape=RoundedCornerShape(17.dp),color=if(rowIndex==0&&index==0)Ruby else CardBg,border=androidx.compose.foundation.BorderStroke(1.dp,if(rowIndex==0&&index==0)Color(0xFFFF6A80) else Color(0xFF58414C))){
-         Column(Modifier.fillMaxSize().padding(8.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=androidx.compose.ui.Alignment.CenterHorizontally){
-          Text(item.third,color=Color.White,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-          Text(item.first,color=Color.White,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
-         }
+      Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(75.dp)){
+       Row(Modifier.fillMaxSize()){
+        listOf("Início","Mapa","Clientes","Rota","Financeiro").forEach{destination->
+         Box(Modifier.weight(1f).fillMaxHeight().clickable{tab=destination})
         }
        }
       }
-     }
-     PremiumCard{
-      Text("Resumo da Semana",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-      Text("Salões mapeados: ${salons.size}",color=Ink)
-      Text("Visitas agendadas: ${appointments.size}",color=Ink)
-      Text("Clientes ativos: ${salons.count{it.status==\"cliente\"}}",color=Ink)
      }
     }
     "Cidades"->{
