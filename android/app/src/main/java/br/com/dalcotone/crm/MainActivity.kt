@@ -581,17 +581,45 @@ class MainActivity:ComponentActivity(){
        Button(onClick={chosenProspect=p;prospectPhotoUrl=null}){Text("Abrir ficha")}
       }
      }
-     Button(onClick={tab="Compartilhar"},modifier=Modifier.fillMaxWidth(),enabled=prospectList.isNotEmpty()){Text("Preparar lista para WhatsApp")}
+     Button(onClick={tab="Compartilhar"},modifier=Modifier.fillMaxWidth(),enabled=prospectList.isNotEmpty()){Text("Enviar TODOS os dados para WhatsApp")}
     }
     "Compartilhar"->{
+     var onlyWithPhone by remember{mutableStateOf(false)}
+     var splitThirty by remember{mutableStateOf(true)}
+     val exportProspects=prospectList.filter{!onlyWithPhone || !it.phone.isNullOrBlank()}
+     val blocks=exportProspects.mapIndexed{index,p->
+      val number=p.phone?.trim().orEmpty()
+      val digits=number.filter{it.isDigit()}
+      val whatsapp=if(digits.length>=10)"https://wa.me/"+(if(digits.startsWith("55"))digits else "55"+digits) else "Não disponível"
+      "${index+1}. ${p.name}\\nEndereço: ${p.address.ifBlank{"Não informado"}}\\nTelefone: ${number.ifBlank{"Não disponível"}}\\nWhatsApp: $whatsapp\\nGoogle Maps: ${if(p.latitude!=null&&p.longitude!=null)"https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}" else "Localização indisponível"}"
+     }
+     val groups=if(splitThirty)blocks.chunked(30) else listOf(blocks)
+     val allText=blocks.joinToString("\\n\\n",prefix="DALCOTONE | Lista de Salões\\nTotal: ${blocks.size}\\n\\n")
      Box(Modifier.fillMaxWidth().height(180.dp)){ApprovedArtworkBackground(panel=3,modifier=Modifier.fillMaxSize())}
-     Text("Enviar para WhatsApp",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     val exportText=prospectList.mapIndexed{index,p->"${index+1}. ${p.name}\\nEndereço: ${p.address}"}.joinToString("\\n\\n")
-     OutlinedTextField(value=exportText,onValueChange={},readOnly=true,label={Text("Prévia dos estabelecimentos encontrados")},modifier=Modifier.fillMaxWidth().height(210.dp))
+     Text("Enviar todos os salões para WhatsApp",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("${exportProspects.size} salões selecionados de ${prospectList.size} encontrados",color=Muted)
+     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+      Checkbox(checked=onlyWithPhone,onCheckedChange={onlyWithPhone=it})
+      Text("Apenas com telefone",color=Ink)
+     }
+     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+      Checkbox(checked=splitThirty,onCheckedChange={splitThirty=it})
+      Text("Dividir em mensagens de 30 salões",color=Ink)
+     }
+     OutlinedTextField(value=allText,onValueChange={},readOnly=true,label={Text("Prévia completa: nome, endereço, telefone, WhatsApp e mapa")},modifier=Modifier.fillMaxWidth().height(220.dp))
      Button(onClick={
-      val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,exportText);setPackage("com.whatsapp")}
-      try{startActivity(intent)}catch(_:Exception){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,exportText)},"Compartilhar lista"))}
-     },enabled=prospectList.isNotEmpty(),modifier=Modifier.fillMaxWidth()){Text("Abrir no WhatsApp")}
+      val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,allText);setPackage("com.whatsapp")}
+      try{startActivity(intent)}catch(_:Exception){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,allText)},"Compartilhar lista"))}
+     },enabled=exportProspects.isNotEmpty(),modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF13B957))){Text("Enviar TODOS (${exportProspects.size}) para WhatsApp",color=Color.White)}
+     if(splitThirty&&groups.size>1){
+      groups.forEachIndexed{index,group->
+       OutlinedButton(onClick={
+        val content="DALCOTONE | Parte ${index+1}/${groups.size}\\n\\n"+group.joinToString("\\n\\n")
+        val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,content)}
+        startActivity(Intent.createChooser(intent,"Compartilhar parte ${index+1}"))
+       },modifier=Modifier.fillMaxWidth()){Text("Enviar parte ${index+1}/${groups.size} (${group.size} salões)")}
+      }
+     }
     }
     "Cidades"->{
      Text("Explore por cidade",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
