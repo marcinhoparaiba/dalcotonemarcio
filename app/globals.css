@@ -48,3 +48,6 @@ nav .active,.primary,.chosen,.travel button,.listrow button,.purchase button{bac
 .weekly-summary{background:linear-gradient(145deg,#22212b,#0d0e14);border-color:#584452}.weekly-summary h2{margin:0 0 14px}.weekly-summary>div{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #49404b}.weekly-summary>div:last-child{border:0}.weekly-summary strong{font-size:23px}
 .radar-heading{display:flex;gap:14px;align-items:center;margin:16px 0 8px;padding:14px;background:radial-gradient(circle at 20% 30%,#6e1027,#190c16 70%);border-radius:17px;border:1px solid #682239}.radar-heading svg{color:#ff2b48}.radar-heading h2{margin:0;color:white}.radar-heading p{font-size:12px;color:#dfbdc5}
 @media(max-width:390px){.brand-text h1{font-size:23px}.home-tiles{gap:8px}.home-tiles button{min-height:105px;font-size:12px}.hero-copy{width:84%}}
+
+/* Keep navigation at the bottom of the installed mobile viewport. */
+@media(max-width:900px){.shell{padding-bottom:98px}.bottom-nav{position:fixed;bottom:env(safe-area-inset-bottom,0px);left:50%;transform:translateX(-50%);width:min(calc(100% - 20px),860px);margin:0}}
