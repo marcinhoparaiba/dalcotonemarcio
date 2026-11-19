@@ -124,53 +124,57 @@ private val ArtGreen=Color(0xFF09C650)
  searching:Boolean,progress:Int,message:String,resultsCount:Int,
  onBack:()->Unit,onScan:()->Unit,onMap:()->Unit,onResults:()->Unit
 ){
- BoxWithConstraints(Modifier.fillMaxSize().background(ArtBlack)){
-  Artwork("dalcotone_rastrear_saloes.png",Modifier.fillMaxSize())
-  val w=maxWidth
-  val h=maxHeight
-  // Cover illustration-only form values; native controls are editable and accessible.
-  Column(Modifier.offset(x=w*0.053f,y=h*0.223f).width(w*0.894f)
-   .height(h*0.429f).background(ArtBlack).padding(horizontal=7.dp),
+ // Header and red map art are cropped from the exact approved PNG; input values
+ // and the search button are real Compose controls, never baked into the image.
+ Column(Modifier.fillMaxSize().background(ArtBlack)){
+  Box(Modifier.fillMaxWidth().weight(.23f)){
+   ArtworkCrop("dalcotone_rastrear_saloes.png",0,0,384,207,Modifier.fillMaxSize())
+   Box(Modifier.align(Alignment.TopStart).fillMaxHeight(.4f).width(70.dp).clickable{onBack()})
+  }
+  Column(Modifier.fillMaxWidth().weight(.43f).padding(horizontal=18.dp),
    verticalArrangement=Arrangement.spacedBy(5.dp)){
-   Text("Cidade",color=ArtInk,fontWeight=FontWeight.Bold,fontSize=13.sp)
-   OutlinedTextField(value=city,onValueChange=onCity,modifier=Modifier.fillMaxWidth().height(51.dp),
-    singleLine=true,placeholder={Text("Cidade da região",color=ArtMuted)},shape=RoundedCornerShape(13.dp),
-    colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=ArtRed,unfocusedBorderColor=Color(0xFF5B505B),focusedTextColor=ArtInk,unfocusedTextColor=ArtInk))
-   Text("Bairro (opcional)",color=ArtInk,fontWeight=FontWeight.Bold,fontSize=13.sp)
-   OutlinedTextField(value=neighborhood,onValueChange=onNeighborhood,
-    modifier=Modifier.fillMaxWidth().height(51.dp),singleLine=true,
-    placeholder={Text("Todos os bairros",color=ArtMuted)},shape=RoundedCornerShape(13.dp),
-    colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=ArtRed,unfocusedBorderColor=Color(0xFF5B505B),focusedTextColor=ArtInk,unfocusedTextColor=ArtInk))
-   Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()){
-    Text("Raio de busca: ${radiusKm.toInt()} km",color=ArtInk,fontSize=13.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
-    Text("GPS",color=ArtMuted,fontSize=11.sp)
-   }
-   Slider(value=radiusKm,onValueChange=onRadius,valueRange=1f..50f,steps=48,modifier=Modifier.fillMaxWidth().height(30.dp),
-    colors=SliderDefaults.colors(thumbColor=ArtRed,activeTrackColor=ArtRed))
-   Button(onClick=onScan,enabled=!searching,modifier=Modifier.fillMaxWidth().height(49.dp),
+   Text("Cidade (filtro de endereço)",color=ArtInk,fontSize=13.sp,fontWeight=FontWeight.Bold)
+   OutlinedTextField(value=city,onValueChange=onCity,modifier=Modifier.fillMaxWidth().height(52.dp),
+    singleLine=true,placeholder={Text("Todas as cidades próximas",color=ArtMuted)},
+    shape=RoundedCornerShape(13.dp),colors=OutlinedTextFieldDefaults.colors(
+     focusedBorderColor=ArtRed,unfocusedBorderColor=Color(0xFF55444D),
+     focusedTextColor=ArtInk,unfocusedTextColor=ArtInk))
+   Text("Bairro (opcional)",color=ArtInk,fontSize=13.sp,fontWeight=FontWeight.Bold)
+   OutlinedTextField(value=neighborhood,onValueChange=onNeighborhood,modifier=Modifier.fillMaxWidth().height(52.dp),
+    singleLine=true,placeholder={Text("Todos os bairros",color=ArtMuted)},
+    shape=RoundedCornerShape(13.dp),colors=OutlinedTextFieldDefaults.colors(
+     focusedBorderColor=ArtRed,unfocusedBorderColor=Color(0xFF55444D),
+     focusedTextColor=ArtInk,unfocusedTextColor=ArtInk))
+   Text("Raio de busca pelo GPS: ${radiusKm.toInt()} km",color=ArtInk,fontSize=13.sp,fontWeight=FontWeight.Bold)
+   Slider(value=radiusKm,onValueChange=onRadius,valueRange=1f..50f,steps=48,
+    modifier=Modifier.fillMaxWidth().height(29.dp),colors=SliderDefaults.colors(thumbColor=ArtRed,activeTrackColor=ArtRed))
+   Button(onClick=onScan,enabled=!searching,modifier=Modifier.fillMaxWidth().height(47.dp),
     shape=RoundedCornerShape(14.dp),
     colors=ButtonDefaults.buttonColors(containerColor=ArtRed,contentColor=Color.White)){
-    Text(if(searching)"Rastreando salões..." else "⌕  Rastrear Salões",fontWeight=FontWeight.Bold)
+    Text(if(searching)"Buscando salões..." else "⌕  Rastrear Salões",fontWeight=FontWeight.ExtraBold)
    }
   }
-  Box(Modifier.offset(x=0.dp,y=0.dp).width(w*0.15f).height(h*0.12f).clickable{onBack()})
-  if(searching || message.isNotBlank()){
-   Surface(Modifier.offset(x=w*0.06f,y=h*0.67f).width(w*0.88f),
-    shape=RoundedCornerShape(15.dp),color=Color(0xF0090A10)){
-    Column(Modifier.padding(11.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-     Text(if(searching)"Consultando estabelecimentos reais..." else message,
-      color=ArtInk,fontSize=12.sp,maxLines=3)
-     if(searching){
-      LinearProgressIndicator(progress={progress.coerceIn(0,100)/100f},
-       modifier=Modifier.fillMaxWidth(),color=ArtRed,trackColor=Color(0xFF4C2631))
-      Text("${progress.coerceIn(0,100)}%",color=ArtInk,fontSize=12.sp)
+  Box(Modifier.fillMaxWidth().weight(.24f).clickable{onMap()}){
+   ArtworkCrop("dalcotone_rastrear_saloes.png",0,548,384,755,Modifier.fillMaxSize())
+   if(searching||message.isNotBlank()){
+    Surface(Modifier.align(Alignment.Center).fillMaxWidth(.9f),
+     color=Color(0xED110C15),shape=RoundedCornerShape(14.dp)){
+     Column(Modifier.padding(11.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+      Text(if(searching)"Consultando salões e números públicos..." else message,
+       color=ArtInk,fontSize=12.sp,maxLines=4)
+      if(searching){
+       LinearProgressIndicator(progress={progress.coerceIn(0,100)/100f},
+        modifier=Modifier.fillMaxWidth(),color=ArtRed,trackColor=Color(0xFF472533))
+       Text("${progress.coerceIn(0,100)}%",color=ArtInk)
+      }
      }
     }
    }
   }
-  Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(h*0.122f),
-   horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
-   TextButton(onClick=onMap){Text("Mapa ao vivo",color=ArtInk)}
+  Row(Modifier.fillMaxWidth().weight(.10f),verticalAlignment=Alignment.CenterVertically,
+   horizontalArrangement=Arrangement.SpaceEvenly){
+   TextButton(onClick=onBack){Text("Início",color=ArtInk)}
+   TextButton(onClick=onMap){Text("Mapa interativo",color=ArtInk)}
    TextButton(onClick=onResults,enabled=resultsCount>0){Text("Resultados ($resultsCount)",color=ArtInk)}
   }
  }
