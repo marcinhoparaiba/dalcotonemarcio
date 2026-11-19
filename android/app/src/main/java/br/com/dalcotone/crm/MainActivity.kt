@@ -525,7 +525,7 @@ class MainActivity:ComponentActivity(){
       val third=maxWidth/3
       val tileTop=maxHeight*0.355f
       val tileHeight=maxHeight*0.14f
-      listOf("Mapa","Rota","Clientes","Financeiro","Clientes","Financeiro").forEachIndexed{index,destination->
+      listOf("Rastrear","Rota","Clientes","Financeiro","Clientes","Financeiro").forEachIndexed{index,destination->
        val column=index%3
        val row=index/3
        Box(Modifier.offset(x=third*column,y=tileTop+tileHeight*row)
@@ -549,6 +549,49 @@ class MainActivity:ComponentActivity(){
       Box(Modifier.offset(x=0.dp,y=0.dp).width(maxWidth*0.18f).height(maxHeight*0.115f)
        .clickable(onClickLabel="Abrir menu"){tab="Mapa"})
      }
+    }
+    "Rastrear"->{
+     Box(Modifier.fillMaxWidth().height(250.dp)){
+      ApprovedArtworkBackground(panel=1,modifier=Modifier.fillMaxSize())
+     }
+     PremiumCard{
+      Text("Rastrear salões",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Text("A pesquisa usa a localização do aparelho e consulta estabelecimentos reais.",color=Muted)
+      Button(onClick={scan()},enabled=!searching,modifier=Modifier.fillMaxWidth()){
+       Text(if(searching)"Buscando estabelecimentos..." else "Rastrear salões próximos")
+      }
+      if(searching||scanFinished){
+       LinearProgressIndicator(progress={scanProgress/100f},modifier=Modifier.fillMaxWidth(),color=Ruby)
+       Text("$scanProgress%",color=Ink)
+      }
+      if(message.isNotBlank())Text(message,color=Ink)
+      OutlinedButton(onClick={tab="Mapa"},modifier=Modifier.fillMaxWidth()){Text("Abrir mapa interativo")}
+      if(prospectList.isNotEmpty())Button(onClick={tab="Resultados"},modifier=Modifier.fillMaxWidth()){Text("Ver ${prospectList.size} resultados")}
+     }
+    }
+    "Resultados"->{
+     Box(Modifier.fillMaxWidth().height(180.dp)){ApprovedArtworkBackground(panel=2,modifier=Modifier.fillMaxSize())}
+     Text("Resultados reais da busca",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     Text("${prospectList.size} salões encontrados",color=Muted)
+     if(prospectList.isEmpty())EmptyPanel("Nenhum resultado","Volte ao rastreamento e pesquise estabelecimentos.")
+     prospectList.forEach{p->
+      PremiumCard{
+       Text(p.name,color=Ink,fontWeight=FontWeight.Bold)
+       Text(p.address.ifBlank{"Endereço não disponível"},color=Muted)
+       Button(onClick={chosenProspect=p;prospectPhotoUrl=null}){Text("Abrir ficha")}
+      }
+     }
+     Button(onClick={tab="Compartilhar"},modifier=Modifier.fillMaxWidth(),enabled=prospectList.isNotEmpty()){Text("Preparar lista para WhatsApp")}
+    }
+    "Compartilhar"->{
+     Box(Modifier.fillMaxWidth().height(180.dp)){ApprovedArtworkBackground(panel=3,modifier=Modifier.fillMaxSize())}
+     Text("Enviar para WhatsApp",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+     val exportText=prospectList.mapIndexed{index,p->"${index+1}. ${p.name}\\nEndereço: ${p.address}"}.joinToString("\\n\\n")
+     OutlinedTextField(value=exportText,onValueChange={},readOnly=true,label={Text("Prévia dos estabelecimentos encontrados")},modifier=Modifier.fillMaxWidth().height(210.dp))
+     Button(onClick={
+      val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,exportText);setPackage("com.whatsapp")}
+      try{startActivity(intent)}catch(_:Exception){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,exportText)},"Compartilhar lista"))}
+     },enabled=prospectList.isNotEmpty(),modifier=Modifier.fillMaxWidth()){Text("Abrir no WhatsApp")}
     }
     "Cidades"->{
      Text("Explore por cidade",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
