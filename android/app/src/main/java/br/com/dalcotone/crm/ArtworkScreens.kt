@@ -60,7 +60,7 @@ private val ArtGreen=Color(0xFF09C650)
   val h=maxHeight
   // The image itself supplies the approved logo, salon photography and six buttons.
   // These independently clickable areas route to the actual CRM modules.
-  val destinations=listOf("Rastrear","Rota","Clientes","Financeiro","Clientes","Financeiro")
+  val destinations=listOf("Rastrear","Rota","Clientes","Financeiro","Contatos","Relatórios")
   destinations.forEachIndexed{index,destination->
    val column=index%3
    val row=index/3
@@ -316,6 +316,40 @@ fun formatSalonExport(results:List<Prospect>,heading:String="DALCOTONE | Lista d
    }
    TextButton(onClick={onCopy(formatSalonExport(eligible))},enabled=eligible.isNotEmpty(),modifier=Modifier.fillMaxWidth()){
     Text("Copiar lista completa",color=ArtInk)
+   }
+  }
+ }
+}
+
+@Composable fun ArtworkBrandHeader(onMenu:()->Unit,onNotifications:()->Unit){
+ val context=LocalContext.current
+ val bitmap=remember{
+  runCatching{context.assets.open("dalcotone_inicio.png").use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()
+ }
+ BoxWithConstraints(Modifier.fillMaxWidth().height(80.dp).background(ArtBlack)){
+  if(bitmap!=null)Canvas(Modifier.fillMaxSize()){
+   drawImage(bitmap,srcOffset=IntOffset(0,0),
+    srcSize=IntSize(bitmap.width,92.coerceAtMost(bitmap.height)),
+    dstOffset=IntOffset.Zero,dstSize=IntSize(size.width.toInt().coerceAtLeast(1),size.height.toInt().coerceAtLeast(1)))
+  }
+  Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(maxWidth*0.20f).clickable{onMenu()})
+  Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(maxWidth*0.18f).clickable{onNotifications()})
+ }
+}
+
+@Composable fun ArtworkBottomNavigation(active:String,onNavigate:(String)->Unit){
+ val items=listOf("Início" to "⌂","Mapa" to "⌖","Clientes" to "♙","Rota" to "◇","Mais" to "•••")
+ Surface(Modifier.fillMaxWidth().height(76.dp),shape=RoundedCornerShape(topStart=18.dp,topEnd=18.dp),
+  color=Color(0xFF0D0D12),border=androidx.compose.foundation.BorderStroke(1.dp,Color(0xFF3C2630))){
+  Row(Modifier.fillMaxSize().padding(horizontal=5.dp,vertical=4.dp)){
+   items.forEach{(destination,symbol)->
+    val selected=active==destination || (destination=="Mais" && active !in listOf("Início","Mapa","Clientes","Rota"))
+    Column(Modifier.weight(1f).fillMaxHeight()
+     .background(if(selected)Color(0xFF970017) else Color.Transparent,RoundedCornerShape(13.dp))
+     .clickable{onNavigate(destination)},verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
+     Text(symbol,fontSize=23.sp,color=if(selected)Color(0xFFFF4E65) else ArtInk,fontWeight=FontWeight.Bold)
+     Text(destination,fontSize=11.sp,color=ArtInk,fontWeight=if(selected)FontWeight.Bold else FontWeight.Normal)
+    }
    }
   }
  }
