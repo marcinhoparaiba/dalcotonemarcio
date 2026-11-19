@@ -3,18 +3,9 @@ package br.com.dalcotone.crm
 import android.Manifest
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.drawImage
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.drawscope.scale
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -426,9 +417,8 @@ class MainActivity:ComponentActivity(){
      else listOf(Color(0xFF0B0B11),Color(0xFF18111A),Color(0xFF230B14))
     )
    ))
-   ApprovedArtworkBackground(panel=when(tab){"Início"->0;"Mapa"->1;"Clientes"->2;else->3},modifier=Modifier.fillMaxSize())
    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Ink){
-   Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   Column(Modifier.fillMaxSize().padding(horizontal=if(tab=="Início")0.dp else 16.dp,vertical=if(tab=="Início")0.dp else 12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
    if(tab!="Início") Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
      Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
@@ -530,18 +520,18 @@ class MainActivity:ComponentActivity(){
     }}
    }else when(tab){
     "Início"->{
-     BoxWithConstraints(Modifier.fillMaxWidth().height(720.dp)){
+     BoxWithConstraints(Modifier.fillMaxSize()){
       ApprovedArtworkBackground(panel=0,modifier=Modifier.fillMaxSize())
       val cellWidth=maxWidth/3
-      val rowHeight=104.dp
+      val rowHeight=maxHeight*0.14f
       listOf(
        Triple("Mapa",0,0),Triple("Rota",1,0),Triple("Clientes",2,0),
        Triple("Financeiro",0,1),Triple("Clientes",1,1),Triple("Financeiro",2,1)
       ).forEach{(destination,column,row)->
-       Box(Modifier.offset(x=cellWidth*column,y=255.dp+rowHeight*row)
+       Box(Modifier.offset(x=cellWidth*column,y=maxHeight*0.355f+rowHeight*row)
         .width(cellWidth).height(rowHeight).clickable{tab=destination})
       }
-      Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(75.dp)){
+      Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(maxHeight*0.105f)){
        Row(Modifier.fillMaxSize()){
         listOf("Início","Mapa","Clientes","Rota","Financeiro").forEach{destination->
          Box(Modifier.weight(1f).fillMaxHeight().clickable{tab=destination})
