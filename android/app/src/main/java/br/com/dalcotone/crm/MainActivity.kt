@@ -450,37 +450,8 @@ class MainActivity:ComponentActivity(){
    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Ink){
    val artTabs=setOf("Início","Rastrear","Resultados","Compartilhar")
    val artworkActive=tab in artTabs && selected==null
-   Column(Modifier.fillMaxSize().padding(horizontal=if(artworkActive)0.dp else 16.dp,vertical=if(artworkActive)0.dp else 12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   if(!artworkActive) Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
-    Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-     Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
-      Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("DC",color=Color.White,fontWeight=FontWeight.ExtraBold)}
-     }
-     Column(Modifier.weight(1f)){
-      Text("Dalcotone",color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.ExtraBold)
-      Text("CONTROLE E CAPTAÇÃO DE CLIENTES",color=Color(0xFFFFA0B0),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
-      Text(when(tab){"Início"->"Painel comercial";"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     }
-     Column(horizontalAlignment=androidx.compose.ui.Alignment.End){
-      Text("${salons.size}",color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-      Text("salões",color=Color(0xFFD6C5CE),style=MaterialTheme.typography.labelSmall)
-     }
-    }
-   }
-   val navigationItems=listOf("Início" to "⌂","Mapa" to "◉","Cidades" to "⌖","Clientes" to "♙","Rota" to "➤","Agenda" to "▦","Financeiro" to "R$")
-   if(!artworkActive) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
-    items(navigationItems){(target,symbol)->
-     val active=tab==target
-     Surface(onClick={tab=target;selected=null;message=""},shape=RoundedCornerShape(15.dp),
-      color=if(active)Ruby else CardBg,
-      border=if(active)null else androidx.compose.foundation.BorderStroke(1.dp,Color(0xFF6A3845))){
-      Row(Modifier.padding(horizontal=14.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
-       Text(symbol,color=if(active)Color.White else Ruby,fontWeight=FontWeight.Bold)
-       Text(target,color=if(active)Color.White else Ink,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium)
-      }
-     }
-    }
-   }
+   Column(Modifier.fillMaxSize().padding(horizontal=if(artworkActive)0.dp else 16.dp,vertical=if(artworkActive)0.dp else 12.dp).padding(bottom=if(artworkActive)0.dp else 76.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   if(!artworkActive) ArtworkBrandHeader(onMenu={tab="Mais"},onNotifications={tab="Contatos"})
    if(message.isNotBlank() && !artworkActive)Surface(color=Color(0xFF381C29),shape=RoundedCornerShape(12.dp)){
     Row(Modifier.fillMaxWidth().padding(10.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
      Text(message,Modifier.weight(1f),color=Ruby,style=MaterialTheme.typography.bodySmall)
@@ -902,6 +873,9 @@ class MainActivity:ComponentActivity(){
      }}
     }
    }
+  }
+  if(!artworkActive)Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter)){
+   ArtworkBottomNavigation(active=tab,onNavigate={destination->tab=destination;selected=null;message=""})
   }
   }
   }
