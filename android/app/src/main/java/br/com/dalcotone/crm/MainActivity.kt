@@ -522,22 +522,32 @@ class MainActivity:ComponentActivity(){
     "Início"->{
      BoxWithConstraints(Modifier.fillMaxSize()){
       ApprovedArtworkBackground(panel=0,modifier=Modifier.fillMaxSize())
-      val cellWidth=maxWidth/3
-      val rowHeight=maxHeight*0.14f
-      listOf(
-       Triple("Mapa",0,0),Triple("Rota",1,0),Triple("Clientes",2,0),
-       Triple("Financeiro",0,1),Triple("Clientes",1,1),Triple("Financeiro",2,1)
-      ).forEach{(destination,column,row)->
-       Box(Modifier.offset(x=cellWidth*column,y=maxHeight*0.355f+rowHeight*row)
-        .width(cellWidth).height(rowHeight).clickable{tab=destination})
+      val third=maxWidth/3
+      val tileTop=maxHeight*0.355f
+      val tileHeight=maxHeight*0.14f
+      listOf("Mapa","Rota","Clientes","Financeiro","Clientes","Financeiro").forEachIndexed{index,destination->
+       val column=index%3
+       val row=index/3
+       Box(Modifier.offset(x=third*column,y=tileTop+tileHeight*row)
+        .width(third).height(tileHeight)
+        .clickable(onClickLabel="Abrir "+destination){tab=destination;selected=null;message=""})
       }
-      Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(maxHeight*0.105f)){
-       Row(Modifier.fillMaxSize()){
-        listOf("Início","Mapa","Clientes","Rota","Financeiro").forEach{destination->
-         Box(Modifier.weight(1f).fillMaxHeight().clickable{tab=destination})
-        }
+      // Cover illustrative figures in the reference PNG with real database values.
+      Box(Modifier.offset(x=maxWidth*0.60f,y=maxHeight*0.733f).width(maxWidth*0.19f).height(maxHeight*0.136f)
+       .background(Color(0xFF161419))){
+       Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceEvenly,horizontalAlignment=androidx.compose.ui.Alignment.End){
+        Text("${salons.size}",color=Color.White,fontWeight=FontWeight.Bold)
+        Text("${salons.count{it.lastContactAt!=null}}",color=Color.White,fontWeight=FontWeight.Bold)
+        Text("${appointments.size}",color=Color.White,fontWeight=FontWeight.Bold)
        }
       }
+      Row(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(maxHeight*0.105f)){
+       listOf("Início","Mapa","Clientes","Rota","Financeiro").forEach{destination->
+        Box(Modifier.weight(1f).fillMaxHeight().clickable(onClickLabel="Abrir "+destination){tab=destination;selected=null;message=""})
+       }
+      }
+      Box(Modifier.offset(x=0.dp,y=0.dp).width(maxWidth*0.18f).height(maxHeight*0.115f)
+       .clickable(onClickLabel="Abrir menu"){tab="Mapa"})
      }
     }
     "Cidades"->{
