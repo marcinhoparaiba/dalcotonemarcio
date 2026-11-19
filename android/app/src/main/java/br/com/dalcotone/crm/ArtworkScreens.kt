@@ -51,33 +51,58 @@ private val ArtGreen=Color(0xFF09C650)
  }
 }
 
+
+@Composable private fun ArtworkCrop(name:String,left:Int,top:Int,right:Int,bottom:Int,modifier:Modifier=Modifier){
+ val context=LocalContext.current
+ val bitmap=remember(name){
+  runCatching{context.assets.open(name).use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()
+ }
+ Box(modifier.background(ArtBlack)){
+  if(bitmap!=null)Canvas(Modifier.fillMaxSize()){
+   val x=left.coerceIn(0,bitmap.width-1)
+   val y=top.coerceIn(0,bitmap.height-1)
+   drawImage(bitmap,srcOffset=IntOffset(x,y),
+    srcSize=IntSize((right-x).coerceIn(1,bitmap.width-x),(bottom-y).coerceIn(1,bitmap.height-y)),
+    dstOffset=IntOffset.Zero,
+    dstSize=IntSize(size.width.toInt().coerceAtLeast(1),size.height.toInt().coerceAtLeast(1)))
+  }
+ }
+}
+
 @Composable fun ArtworkHome(
  salons:Int,contacts:Int,appointments:Int,onNavigate:(String)->Unit
 ){
- BoxWithConstraints(Modifier.fillMaxSize().background(ArtBlack)){
-  Artwork("dalcotone_inicio.png",Modifier.fillMaxSize())
-  val w=maxWidth
-  val h=maxHeight
-  // The image itself supplies the approved logo, salon photography and six buttons.
-  // These independently clickable areas route to the actual CRM modules.
-  val destinations=listOf("Rastrear","Rota","Clientes","Financeiro","Contatos","Relatórios")
-  destinations.forEachIndexed{index,destination->
-   val column=index%3
-   val row=index/3
-   Box(Modifier.offset(x=w*(0.052f+0.328f*column),y=h*(0.352f+0.139f*row))
-    .width(w*0.30f).height(h*0.131f)
-    .clickable{onNavigate(destination)})
+ // Layout is built from independent, functional regions. Only the approved
+ // logo, product photograph and six button artworks remain raster images.
+ Column(Modifier.fillMaxSize().background(ArtBlack)){
+  ArtworkBrandHeader(onMenu={onNavigate("Mais")},onNotifications={onNavigate("Contatos")})
+  ArtworkCrop("dalcotone_inicio.png",0,91,384,306,Modifier.fillMaxWidth().weight(.33f))
+  val tiles=listOf(
+   Triple("Rastrear",18 to 306,142 to 424),
+   Triple("Rota",146 to 306,267 to 424),
+   Triple("Clientes",272 to 306,383 to 424),
+   Triple("Financeiro",18 to 427,142 to 549),
+   Triple("Contatos",146 to 427,267 to 549),
+   Triple("Relatórios",272 to 427,383 to 549)
+  )
+  Column(Modifier.fillMaxWidth().weight(.36f).padding(horizontal=11.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+   tiles.chunked(3).forEach{row->
+    Row(Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+     row.forEach{(destination,start,finish)->
+      Box(Modifier.weight(1f).fillMaxHeight().clickable{onNavigate(destination)}){
+       ArtworkCrop("dalcotone_inicio.png",start.first,start.second,finish.first,finish.second,Modifier.fillMaxSize())
+      }
+     }
+    }
+   }
   }
-  // Replace the COMPLETE fake statistics region: never show 328/187/42 or fake growth.
-  Surface(
-   modifier=Modifier.offset(x=w*0.049f,y=h*0.648f).width(w*0.902f).height(h*0.225f),
-   shape=RoundedCornerShape(18.dp),
-   color=ArtPanel,
-   border=androidx.compose.foundation.BorderStroke(1.dp,Color(0xFF52404A))
-  ){
+  Surface(Modifier.fillMaxWidth().weight(.31f).padding(horizontal=15.dp,vertical=8.dp),
+   shape=RoundedCornerShape(18.dp),color=ArtPanel,
+   border=androidx.compose.foundation.BorderStroke(1.dp,Color(0xFF55414C))){
    Row{
     Box(Modifier.width(4.dp).fillMaxHeight().background(ArtRed))
-    Column(Modifier.fillMaxSize().padding(horizontal=15.dp,vertical=10.dp),verticalArrangement=Arrangement.SpaceEvenly){
+    Column(Modifier.fillMaxSize().padding(horizontal=16.dp,vertical=8.dp),
+     verticalArrangement=Arrangement.SpaceEvenly){
      Text("Resumo da Semana",color=ArtInk,fontWeight=FontWeight.ExtraBold,fontSize=17.sp)
      listOf("Salões mapeados" to salons,"Contatos nos últimos 7 dias" to contacts,"Visitas agendadas" to appointments).forEach{(label,value)->
       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
@@ -88,13 +113,7 @@ private val ArtGreen=Color(0xFF09C650)
     }
    }
   }
-  // Five navigation slots match the original artwork.
-  listOf("Início","Mapa","Clientes","Rota","Mais").forEachIndexed{index,destination->
-   Box(Modifier.offset(x=w*(index/5f),y=h*0.889f).width(w*0.2f).height(h*0.111f)
-    .clickable{onNavigate(destination)})
-  }
-  Box(Modifier.offset(x=w*0.01f,y=h*0.018f).width(w*0.16f).height(h*0.077f)
-   .clickable{onNavigate("Mais")})
+  ArtworkBottomNavigation(active="Início",onNavigate=onNavigate)
  }
 }
 
