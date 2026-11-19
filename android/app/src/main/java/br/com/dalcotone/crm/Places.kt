@@ -35,12 +35,12 @@ class PlacesRepository {
    JSONObject(response.body?.string()?:"{}").optString("photoUri").ifBlank{null}
   }
  }
- suspend fun nearby(latitude:Double,longitude:Double):List<Prospect> = withContext(Dispatchers.IO){
+ suspend fun nearby(latitude:Double,longitude:Double,radiusMeters:Double=10000.0):List<Prospect> = withContext(Dispatchers.IO){
   val key=BuildConfig.PLACES_API_KEY
   require(key.isNotBlank()){"Google Places não configurado"}
   val body=JSONObject().put("includedTypes",org.json.JSONArray().put("beauty_salon").put("hair_salon"))
    .put("maxResultCount",20)
-   .put("locationRestriction",JSONObject().put("circle",JSONObject().put("center",JSONObject().put("latitude",latitude).put("longitude",longitude)).put("radius",10000.0)))
+   .put("locationRestriction",JSONObject().put("circle",JSONObject().put("center",JSONObject().put("latitude",latitude).put("longitude",longitude)).put("radius",radiusMeters.coerceIn(1000.0,50000.0))))
   val request=Request.Builder().url("https://places.googleapis.com/v1/places:searchNearby")
    .addHeader("X-Goog-Api-Key",key).addHeader("X-Goog-FieldMask","places.id,places.displayName,places.formattedAddress,places.location,places.businessStatus")
    .post(body.toString().toRequestBody("application/json".toMediaType())).build()
