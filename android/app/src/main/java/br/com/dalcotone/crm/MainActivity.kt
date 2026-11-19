@@ -58,18 +58,16 @@ import java.util.Locale
 // Each of the four equal-width panels is displayed without recoloring or redrawing.
 @Composable private fun ApprovedArtworkBackground(panel:Int,modifier:Modifier=Modifier){
  val context=LocalContext.current
- val artwork=remember{
+ val filenames=listOf("dalcotone_inicio.png","dalcotone_rastrear_saloes.png","dalcotone_resultado_busca.png","dalcotone_enviar_whatsapp.png")
+ val artwork=remember(context,panel){
   runCatching{
-   context.assets.open("dalcotone-four-panels.png").use{BitmapFactory.decodeStream(it).asImageBitmap()}
+   context.assets.open(filenames[panel.coerceIn(0,3)]).use{BitmapFactory.decodeStream(it).asImageBitmap()}
   }.getOrNull()
  }
  if(artwork!=null){
   Canvas(modifier){
-   val segmentWidth=artwork.width/4
    drawImage(
     image=artwork,
-    srcOffset=IntOffset(segmentWidth*panel.coerceIn(0,3),0),
-    srcSize=IntSize(segmentWidth,artwork.height),
     dstOffset=IntOffset.Zero,
     dstSize=IntSize(size.width.toInt().coerceAtLeast(1),size.height.toInt().coerceAtLeast(1))
    )
