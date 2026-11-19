@@ -91,6 +91,7 @@ class MainActivity:ComponentActivity(){
   val dao=remember{CrmDatabase.get(this).dao()}
   val salons by dao.salons().collectAsStateWithLifecycle(initialValue=emptyList())
   val appointments by dao.appointments().collectAsStateWithLifecycle(initialValue=emptyList())
+  val visits by dao.visits().collectAsStateWithLifecycle(initialValue=emptyList())
   val sales by dao.sales().collectAsStateWithLifecycle(initialValue=emptyList())
   val payments by dao.payments().collectAsStateWithLifecycle(initialValue=emptyList())
   val items by dao.items().collectAsStateWithLifecycle(initialValue=emptyList())
@@ -132,6 +133,10 @@ class MainActivity:ComponentActivity(){
   var amount by remember{mutableStateOf("")}
   var paymentMethod by remember{mutableStateOf("pix")}
   var prospectList by remember{mutableStateOf<List<Prospect>>(emptyList())}
+  var selectedProspects by remember{mutableStateOf<Set<String>>(emptySet())}
+  var cityQuery by remember{mutableStateOf("")}
+  var neighborhoodQuery by remember{mutableStateOf("")}
+  var radiusKm by remember{mutableFloatStateOf(10f)}
   var chosenProspect by remember{mutableStateOf<Prospect?>(null)}
   var prospectPhotoUrl by remember{mutableStateOf<String?>(null)}
   var detailsLoading by remember{mutableStateOf(false)}
@@ -370,7 +375,10 @@ class MainActivity:ComponentActivity(){
     message="Buscando salões próximos no Google..."
     try{
      val known=salons.mapNotNull{it.placeId}.toSet()
-     val found=places.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
+     val found=places.nearby(location.latitude,location.longitude,radiusKm.toDouble()*1000.0).filter{p->
+      (cityQuery.isBlank() || p.address.contains(cityQuery.trim(),ignoreCase=true)) &&
+      (neighborhoodQuery.isBlank() || p.address.contains(neighborhoodQuery.trim(),ignoreCase=true))
+     }
      var phonesFound=0
      val detailed=found.map{p->
       try{
@@ -380,10 +388,12 @@ class MainActivity:ComponentActivity(){
       }catch(_:Exception){p}
      }
      val saved=persistDiscovery(detailed)
-     prospectList=emptyList()
+     prospectList=detailed
+     selectedProspects=detailed.map{it.placeId}.toSet()
      message="${found.size} salões encontrados no Google • $saved novos salvos • $phonesFound telefones públicos encontrados."
      scanProgress=100
      scanFinished=true
+     tab="Resultados"
     }catch(e:Exception){scanProgress=0;scanFinished=false;message="Não foi possível consultar o Google: "+(e.message?:"erro de conexão")}
     finally{searching=false}
    }
@@ -404,10 +414,30 @@ class MainActivity:ComponentActivity(){
      val existing=prospectList.associateBy{it.placeId}
      val found=osm.nearby(location.latitude,location.longitude).filter{it.placeId !in known}
      val saved=persistDiscovery(found)
-     prospectList=emptyList()
+     prospectList=found
+     selectedProspects=found.map{it.placeId}.toSet()
+     tab="Resultados"
      message="${found.size} salões encontrados no OpenStreetMap • $saved novos salvos offline."
     }catch(e:Exception){message=e.message?:"Busca OpenStreetMap indisponível"}
     finally{searching=false}
+   }
+  }
+
+  fun copyProspectText(content:String){
+   val clipboard=getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+   clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Lista Dalcotone",content))
+   message="Lista de salões copiada."
+  }
+  fun shareProspectText(content:String){
+   if(content.isBlank()){message="Não há estabelecimentos selecionados.";return}
+   val share=Intent(Intent.ACTION_SEND).apply{
+    type="text/plain"
+    putExtra(Intent.EXTRA_TEXT,content)
+   }
+   try{startActivity(Intent(share).apply{setPackage("com.whatsapp")})}
+   catch(_:Exception){
+    try{startActivity(Intent.createChooser(share,"Compartilhar lista de salões"))}
+    catch(e:Exception){message="Não foi possível abrir o compartilhamento: ${e.message}"}
    }
   }
   Box(Modifier.fillMaxSize()){
@@ -418,8 +448,10 @@ class MainActivity:ComponentActivity(){
     )
    ))
    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Ink){
-   Column(Modifier.fillMaxSize().padding(horizontal=if(tab=="Início")0.dp else 16.dp,vertical=if(tab=="Início")0.dp else 12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   if(tab!="Início") Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
+   val artTabs=setOf("Início","Rastrear","Resultados","Compartilhar")
+   val artworkActive=tab in artTabs && selected==null
+   Column(Modifier.fillMaxSize().padding(horizontal=if(artworkActive)0.dp else 16.dp,vertical=if(artworkActive)0.dp else 12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   if(!artworkActive) Surface(shape=RoundedCornerShape(20.dp),color=Color(0xFF160F18),modifier=Modifier.fillMaxWidth()){
     Row(Modifier.padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
      Surface(shape=RoundedCornerShape(12.dp),color=Ruby,modifier=Modifier.size(44.dp)){
       Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("DC",color=Color.White,fontWeight=FontWeight.ExtraBold)}
@@ -436,7 +468,7 @@ class MainActivity:ComponentActivity(){
     }
    }
    val navigationItems=listOf("Início" to "⌂","Mapa" to "◉","Cidades" to "⌖","Clientes" to "♙","Rota" to "➤","Agenda" to "▦","Financeiro" to "R$")
-   if(tab!="Início") LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
+   if(!artworkActive) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
     items(navigationItems){(target,symbol)->
      val active=tab==target
      Surface(onClick={tab=target;selected=null;message=""},shape=RoundedCornerShape(15.dp),
@@ -449,7 +481,7 @@ class MainActivity:ComponentActivity(){
      }
     }
    }
-   if(message.isNotBlank())Surface(color=Color(0xFF381C29),shape=RoundedCornerShape(12.dp)){
+   if(message.isNotBlank() && !artworkActive)Surface(color=Color(0xFF381C29),shape=RoundedCornerShape(12.dp)){
     Row(Modifier.fillMaxWidth().padding(10.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
      Text(message,Modifier.weight(1f),color=Ruby,style=MaterialTheme.typography.bodySmall)
      TextButton(onClick={message=""},contentPadding=PaddingValues(horizontal=6.dp)){Text("Fechar")}
@@ -520,108 +552,68 @@ class MainActivity:ComponentActivity(){
     }}
    }else when(tab){
     "Início"->{
-     BoxWithConstraints(Modifier.fillMaxSize()){
-      ApprovedArtworkBackground(panel=0,modifier=Modifier.fillMaxSize())
-      val third=maxWidth/3
-      val tileTop=maxHeight*0.355f
-      val tileHeight=maxHeight*0.14f
-      listOf("Rastrear","Rota","Clientes","Financeiro","Clientes","Financeiro").forEachIndexed{index,destination->
-       val column=index%3
-       val row=index/3
-       Box(Modifier.offset(x=third*column,y=tileTop+tileHeight*row)
-        .width(third).height(tileHeight)
-        .clickable(onClickLabel="Abrir "+destination){tab=destination;selected=null;message=""})
-      }
-      // Cover illustrative figures in the reference PNG with real database values.
-      Box(Modifier.offset(x=maxWidth*0.60f,y=maxHeight*0.733f).width(maxWidth*0.19f).height(maxHeight*0.136f)
-       .background(Color(0xFF161419))){
-       Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceEvenly,horizontalAlignment=androidx.compose.ui.Alignment.End){
-        Text("${salons.size}",color=Color.White,fontWeight=FontWeight.Bold)
-        Text("${salons.count{it.lastContactAt!=null}}",color=Color.White,fontWeight=FontWeight.Bold)
-        Text("${appointments.size}",color=Color.White,fontWeight=FontWeight.Bold)
-       }
-      }
-      Row(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(maxHeight*0.105f)){
-       listOf("Início","Mapa","Clientes","Rota","Financeiro").forEach{destination->
-        Box(Modifier.weight(1f).fillMaxHeight().clickable(onClickLabel="Abrir "+destination){tab=destination;selected=null;message=""})
-       }
-      }
-      Box(Modifier.offset(x=0.dp,y=0.dp).width(maxWidth*0.18f).height(maxHeight*0.115f)
-       .clickable(onClickLabel="Abrir menu"){tab="Mapa"})
-     }
+     ArtworkHome(
+      salons=salons.size,
+      contacts=visits.count{it.visitedAt>=System.currentTimeMillis()-7L*24*60*60*1000},
+      appointments=appointments.count{!it.completed && it.startsAt>=System.currentTimeMillis()},
+      onNavigate={destination->tab=destination;selected=null;message=""}
+     )
     }
     "Rastrear"->{
-     Box(Modifier.fillMaxWidth().height(250.dp)){
-      ApprovedArtworkBackground(panel=1,modifier=Modifier.fillMaxSize())
-     }
-     PremiumCard{
-      Text("Rastrear salões",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-      Text("A pesquisa usa a localização do aparelho e consulta estabelecimentos reais.",color=Muted)
-      Button(onClick={scan()},enabled=!searching,modifier=Modifier.fillMaxWidth()){
-       Text(if(searching)"Buscando estabelecimentos..." else "Rastrear salões próximos")
-      }
-      if(searching||scanFinished){
-       LinearProgressIndicator(progress={scanProgress/100f},modifier=Modifier.fillMaxWidth(),color=Ruby)
-       Text("$scanProgress%",color=Ink)
-      }
-      if(message.isNotBlank())Text(message,color=Ink)
-      OutlinedButton(onClick={tab="Mapa"},modifier=Modifier.fillMaxWidth()){Text("Abrir mapa interativo")}
-      if(prospectList.isNotEmpty())Button(onClick={tab="Resultados"},modifier=Modifier.fillMaxWidth()){Text("Ver ${prospectList.size} resultados")}
-     }
+     ArtworkRadar(
+      city=cityQuery,onCity={cityQuery=it},
+      neighborhood=neighborhoodQuery,onNeighborhood={neighborhoodQuery=it},
+      radiusKm=radiusKm,onRadius={radiusKm=it},
+      searching=searching,progress=scanProgress,message=message,resultsCount=prospectList.size,
+      onBack={tab="Início"},onScan={scan()},onMap={tab="Mapa"},onResults={tab="Resultados"}
+     )
     }
     "Resultados"->{
-     Box(Modifier.fillMaxWidth().height(180.dp)){ApprovedArtworkBackground(panel=2,modifier=Modifier.fillMaxSize())}
-     Text("Resultados reais da busca",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     Text("${prospectList.size} salões encontrados",color=Muted)
-     if(prospectList.isEmpty())EmptyPanel("Nenhum resultado","Volte ao rastreamento e pesquise estabelecimentos.")
-     prospectList.forEach{p->
-      PremiumCard{
-       Text(p.name,color=Ink,fontWeight=FontWeight.Bold)
-       Text(p.address.ifBlank{"Endereço não disponível"},color=Muted)
-       Button(onClick={chosenProspect=p;prospectPhotoUrl=null}){Text("Abrir ficha")}
-      }
-     }
-     Button(onClick={tab="Compartilhar"},modifier=Modifier.fillMaxWidth(),enabled=prospectList.isNotEmpty()){Text("Enviar TODOS os dados para WhatsApp")}
+     ArtworkResults(results=prospectList,selectedIds=selectedProspects,
+      onSelect={id->selectedProspects=if(id in selectedProspects)selectedProspects-id else selectedProspects+id},
+      onSelectAll={all->selectedProspects=if(all)prospectList.map{it.placeId}.toSet() else emptySet()},
+      onOpen={chosenProspect=it;prospectPhotoUrl=null},
+      onBack={tab="Rastrear"},onShare={tab="Compartilhar"},
+      onCopy={copyProspectText(formatSalonExport(prospectList.filter{it.placeId in selectedProspects}))}
+     )
     }
     "Compartilhar"->{
-     var onlyWithPhone by remember{mutableStateOf(false)}
-     var splitThirty by remember{mutableStateOf(true)}
-     val exportProspects=prospectList.filter{!onlyWithPhone || !it.phone.isNullOrBlank()}
-     val blocks=exportProspects.mapIndexed{index,p->
-      val number=p.phone?.trim().orEmpty()
-      val digits=number.filter{it.isDigit()}
-      val whatsapp=if(digits.length>=10)"https://wa.me/"+(if(digits.startsWith("55"))digits else "55"+digits) else "Não disponível"
-      "${index+1}. ${p.name}\\nEndereço: ${p.address.ifBlank{"Não informado"}}\\nTelefone: ${number.ifBlank{"Não disponível"}}\\nWhatsApp: $whatsapp\\nGoogle Maps: ${if(p.latitude!=null&&p.longitude!=null)"https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}" else "Localização indisponível"}"
-     }
-     val groups=if(splitThirty)blocks.chunked(30) else listOf(blocks)
-     var selectedBatch by remember{mutableIntStateOf(0)}
-     val allText=blocks.joinToString("\\n\\n",prefix="DALCOTONE | Lista de Salões\\nTotal: ${blocks.size}\\n\\n")
-     Box(Modifier.fillMaxWidth().height(180.dp)){ApprovedArtworkBackground(panel=3,modifier=Modifier.fillMaxSize())}
-     Text("Enviar todos os salões para WhatsApp",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-     Text("${exportProspects.size} salões selecionados de ${prospectList.size} encontrados",color=Muted)
-     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
-      Checkbox(checked=onlyWithPhone,onCheckedChange={onlyWithPhone=it})
-      Text("Apenas com telefone",color=Ink)
-     }
-     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
-      Checkbox(checked=splitThirty,onCheckedChange={splitThirty=it})
-      Text("Dividir em mensagens de 30 salões",color=Ink)
-     }
-     OutlinedTextField(value=allText,onValueChange={},readOnly=true,label={Text("Prévia completa: nome, endereço, telefone, WhatsApp e mapa")},modifier=Modifier.fillMaxWidth().height(220.dp))
-     Button(onClick={
-      val selectedText=if(splitThirty && groups.size>1) "DALCOTONE | Parte ${selectedBatch.coerceIn(0,groups.lastIndex)+1}/${groups.size}\\n\\n"+groups[selectedBatch.coerceIn(0,groups.lastIndex)].joinToString("\\n\\n") else allText
-      val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,selectedText);setPackage("com.whatsapp")}
-      try{startActivity(intent)}catch(_:Exception){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,selectedText)},"Compartilhar lista"))}
-     },enabled=exportProspects.isNotEmpty(),modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF13B957))){Text(if(splitThirty&&groups.size>1)"Enviar parte ${selectedBatch.coerceIn(0,groups.lastIndex)+1}/${groups.size} ao WhatsApp" else "Enviar TODOS (${exportProspects.size}) para WhatsApp",color=Color.White)}
-     if(splitThirty&&groups.size>1){
-      groups.forEachIndexed{index,group->
-       OutlinedButton(onClick={
-        selectedBatch=index
-        val content="DALCOTONE | Parte ${index+1}/${groups.size}\\n\\n"+group.joinToString("\\n\\n")
-        val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,content)}
-        startActivity(Intent.createChooser(intent,"Compartilhar parte ${index+1}"))
-       },modifier=Modifier.fillMaxWidth()){Text("Enviar parte ${index+1}/${groups.size} (${group.size} salões)")}
+     ArtworkShare(results=prospectList.filter{it.placeId in selectedProspects},
+      onBack={tab="Resultados"},onSend={shareProspectText(it)},onCopy={copyProspectText(it)})
+    }
+    "Mais"->{
+     Text("Mais ferramentas",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.ExtraBold,color=Ink)
+     PremiumCard{
+      listOf("Rastrear" to "Rastrear salões","Mapa" to "Mapa comercial",
+       "Resultados" to "Resultados da busca","Clientes" to "Carteira de clientes",
+       "Cidades" to "Territórios","Rota" to "Rotas de visita",
+       "Agenda" to "Agenda","Financeiro" to "Cobranças",
+       "Contatos" to "Contato e relacionamento","Relatórios" to "Relatórios").forEach{(destination,label)->
+       OutlinedButton(onClick={tab=destination},modifier=Modifier.fillMaxWidth()){Text(label)}
       }
+     }
+    }
+    "Contatos"->{
+     Text("Contatos da semana",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Ink)
+     Text("O WhatsApp abre para revisão e confirmação manual do envio.",color=Muted)
+     val pending=salons.filter{contactDue(it)}
+     if(pending.isEmpty())EmptyPanel("Nenhum contato pendente","Clientes atendidos entram na rotina de relacionamento a cada sete dias.")
+     pending.forEach{s->
+      PremiumCard{
+       Text(s.name,color=Ink,fontWeight=FontWeight.Bold)
+       Text(s.phone.ifBlank{"Número não cadastrado"},color=Muted)
+       Button(onClick={openMessage(s)}){Text("Preparar mensagem")}
+      }
+     }
+    }
+    "Relatórios"->{
+     Text("Relatórios comerciais",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Ink)
+     PremiumCard{
+      Text("Salões cadastrados: ${salons.size}",color=Ink)
+      Text("Clientes: ${salons.count{it.status=="cliente"}}",color=Ink)
+      Text("Contatos registrados na semana: ${visits.count{it.visitedAt>=System.currentTimeMillis()-7L*24*60*60*1000}}",color=Ink)
+      Text("Visitas agendadas: ${appointments.count{!it.completed&&it.startsAt>=System.currentTimeMillis()}}",color=Ink)
+      Text("Total a receber: ${money.format((sales.sumOf{it.totalCents}-payments.sumOf{it.amountCents})/100.0)}",color=Ruby)
      }
     }
     "Cidades"->{
