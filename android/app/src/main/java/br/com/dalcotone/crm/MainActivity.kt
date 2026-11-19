@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -66,7 +67,7 @@ class MainActivity:ComponentActivity(){
   val payments by dao.payments().collectAsStateWithLifecycle(initialValue=emptyList())
   val items by dao.items().collectAsStateWithLifecycle(initialValue=emptyList())
   val scope=rememberCoroutineScope()
-  var tab by remember{mutableStateOf("Mapa")}
+  var tab by remember{mutableStateOf("Início")}
   val mapSession=remember{SalonMapSession()}
   var selected by remember{mutableStateOf<Salon?>(null)}
   var phoneEditor by remember{mutableStateOf<Salon?>(null)}
@@ -110,6 +111,9 @@ class MainActivity:ComponentActivity(){
   var cnpjText by remember{mutableStateOf("")}
   var cnpjResult by remember{mutableStateOf<CnpjBusiness?>(null)}
   var searching by remember{mutableStateOf(false)}
+  var scanProgress by remember{mutableIntStateOf(0)}
+  var scanFinished by remember{mutableStateOf(false)}
+  LaunchedEffect(searching){if(searching){while(searching){delay(160);scanProgress=(scanProgress+maxOf(1,(94-scanProgress)/12)).coerceAtMost(94)}}}
   var enrichingPhones by remember{mutableStateOf(false)}
   val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
   val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){}
@@ -333,6 +337,8 @@ class MainActivity:ComponentActivity(){
    if(location==null){message="Sem posição recente. Ative o GPS e tente novamente.";return}
    scope.launch{
     searching=true
+    scanFinished=false
+    scanProgress=3
     message="Buscando salões próximos no Google..."
     try{
      val known=salons.mapNotNull{it.placeId}.toSet()
@@ -348,7 +354,9 @@ class MainActivity:ComponentActivity(){
      val saved=persistDiscovery(detailed)
      prospectList=emptyList()
      message="${found.size} salões encontrados no Google • $saved novos salvos • $phonesFound telefones públicos encontrados."
-    }catch(e:Exception){message="Não foi possível consultar o Google: "+(e.message?:"erro de conexão")}
+     scanProgress=100
+     scanFinished=true
+    }catch(e:Exception){scanProgress=0;scanFinished=false;message="Não foi possível consultar o Google: "+(e.message?:"erro de conexão")}
     finally{searching=false}
    }
   }
@@ -389,8 +397,9 @@ class MainActivity:ComponentActivity(){
       Box(contentAlignment=androidx.compose.ui.Alignment.Center){Text("DC",color=Color.White,fontWeight=FontWeight.ExtraBold)}
      }
      Column(Modifier.weight(1f)){
-      Text("DAL COTONE",color=Color(0xFFFFA0B0),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
-      Text(when(tab){"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Text("Dalcotone",color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.ExtraBold)
+      Text("CONTROLE E CAPTAÇÃO DE CLIENTES",color=Color(0xFFFFA0B0),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
+      Text(when(tab){"Início"->"Painel comercial";"Mapa"->"Radar comercial";"Cidades"->"Territórios";"Clientes"->"Minha carteira";"Rota"->"Planejar visitas";"Agenda"->"Minha agenda";else->"Financeiro"},color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
      }
      Column(horizontalAlignment=androidx.compose.ui.Alignment.End){
       Text("${salons.size}",color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
@@ -398,7 +407,7 @@ class MainActivity:ComponentActivity(){
      }
     }
    }
-   val navigationItems=listOf("Mapa" to "◉","Cidades" to "⌖","Clientes" to "♙","Rota" to "➤","Agenda" to "▦","Financeiro" to "R$")
+   val navigationItems=listOf("Início" to "⌂","Mapa" to "◉","Cidades" to "⌖","Clientes" to "♙","Rota" to "➤","Agenda" to "▦","Financeiro" to "R$")
    LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(vertical=2.dp)){
     items(navigationItems){(target,symbol)->
      val active=tab==target
@@ -482,6 +491,37 @@ class MainActivity:ComponentActivity(){
      }}
     }}
    }else when(tab){
+    "Início"->{
+     Surface(shape=RoundedCornerShape(22.dp),color=Color(0xFF3B0C1B),modifier=Modifier.fillMaxWidth()){
+      Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+       Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)){
+        Text("DALCOTONE PROFESSIONAL",color=Color(0xFFFF889A),style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
+        Text("Mais do que produtos, resultado para os salões!",color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.ExtraBold)
+        Text("Controle, captação e relacionamento em um só lugar.",color=Muted,style=MaterialTheme.typography.bodySmall)
+       }
+       Text("DC",color=Color(0xFFFF3B59),style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Black)
+      }
+     }
+     val shortcuts=listOf(Triple("Rastrear Salões","Mapa","◉"),Triple("Rotas","Rota","➤"),Triple("Clientes","Clientes","♙"),Triple("Cobranças","Financeiro","R$"),Triple("Contato Automático","Clientes","✉"),Triple("Relatórios","Financeiro","▦"))
+     shortcuts.chunked(3).forEachIndexed{rowIndex,row->
+      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(9.dp)){
+       row.forEachIndexed{index,item->
+        Surface(onClick={tab=item.second},modifier=Modifier.weight(1f).height(112.dp),shape=RoundedCornerShape(17.dp),color=if(rowIndex==0&&index==0)Ruby else CardBg,border=androidx.compose.foundation.BorderStroke(1.dp,if(rowIndex==0&&index==0)Color(0xFFFF6A80) else Color(0xFF58414C))){
+         Column(Modifier.fillMaxSize().padding(8.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=androidx.compose.ui.Alignment.CenterHorizontally){
+          Text(item.third,color=Color.White,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
+          Text(item.first,color=Color.White,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold)
+         }
+        }
+       }
+      }
+     }
+     PremiumCard{
+      Text("Resumo da Semana",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Text("Salões mapeados: ${salons.size}",color=Ink)
+      Text("Visitas agendadas: ${appointments.size}",color=Ink)
+      Text("Clientes ativos: ${salons.count{it.status==\"cliente\"}}",color=Ink)
+     }
+    }
     "Cidades"->{
      Text("Explore por cidade",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
      Text("Organize a prospecção por território e acompanhe os atendimentos.",style=MaterialTheme.typography.bodySmall,color=Muted)
@@ -629,6 +669,13 @@ class MainActivity:ComponentActivity(){
       Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
        OutlinedButton(onClick={speak()},modifier=Modifier.weight(1f)){Text("🎙 Anotar por voz")}
        OutlinedButton(onClick={tab="Agenda"},modifier=Modifier.weight(1f)){Text("Agenda inteligente")}
+      }
+      if(searching||scanFinished){
+       PremiumCard{
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(if(searching)"Rastreando salões..." else "Pesquisa concluída",color=Ink,fontWeight=FontWeight.Bold);Text("$scanProgress%",color=Ruby,fontWeight=FontWeight.Bold)}
+        LinearProgressIndicator(progress={scanProgress/100f},modifier=Modifier.fillMaxWidth().height(12.dp),color=Ruby,trackColor=Color(0xFF42202D))
+        Text(if(searching)"Consultando estabelecimentos e telefones disponíveis..." else "Resultados recebidos e salvos.",color=Muted,style=MaterialTheme.typography.bodySmall)
+       }
       }
       Text("Mapa: OpenStreetMap  •  Salões salvos disponíveis offline",color=Muted,style=MaterialTheme.typography.labelSmall)
       if(prospectList.isNotEmpty())Text("Oportunidades encontradas",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
