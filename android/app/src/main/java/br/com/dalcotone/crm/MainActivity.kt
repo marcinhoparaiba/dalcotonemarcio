@@ -594,6 +594,7 @@ class MainActivity:ComponentActivity(){
       "${index+1}. ${p.name}\\nEndereço: ${p.address.ifBlank{"Não informado"}}\\nTelefone: ${number.ifBlank{"Não disponível"}}\\nWhatsApp: $whatsapp\\nGoogle Maps: ${if(p.latitude!=null&&p.longitude!=null)"https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}" else "Localização indisponível"}"
      }
      val groups=if(splitThirty)blocks.chunked(30) else listOf(blocks)
+     var selectedBatch by remember{mutableIntStateOf(0)}
      val allText=blocks.joinToString("\\n\\n",prefix="DALCOTONE | Lista de Salões\\nTotal: ${blocks.size}\\n\\n")
      Box(Modifier.fillMaxWidth().height(180.dp)){ApprovedArtworkBackground(panel=3,modifier=Modifier.fillMaxSize())}
      Text("Enviar todos os salões para WhatsApp",color=Ink,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
@@ -608,12 +609,14 @@ class MainActivity:ComponentActivity(){
      }
      OutlinedTextField(value=allText,onValueChange={},readOnly=true,label={Text("Prévia completa: nome, endereço, telefone, WhatsApp e mapa")},modifier=Modifier.fillMaxWidth().height(220.dp))
      Button(onClick={
-      val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,allText);setPackage("com.whatsapp")}
-      try{startActivity(intent)}catch(_:Exception){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,allText)},"Compartilhar lista"))}
-     },enabled=exportProspects.isNotEmpty(),modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF13B957))){Text("Enviar TODOS (${exportProspects.size}) para WhatsApp",color=Color.White)}
+      val selectedText=if(splitThirty && groups.size>1) "DALCOTONE | Parte ${selectedBatch.coerceIn(0,groups.lastIndex)+1}/${groups.size}\\n\\n"+groups[selectedBatch.coerceIn(0,groups.lastIndex)].joinToString("\\n\\n") else allText
+      val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,selectedText);setPackage("com.whatsapp")}
+      try{startActivity(intent)}catch(_:Exception){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,selectedText)},"Compartilhar lista"))}
+     },enabled=exportProspects.isNotEmpty(),modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF13B957))){Text(if(splitThirty&&groups.size>1)"Enviar parte ${selectedBatch.coerceIn(0,groups.lastIndex)+1}/${groups.size} ao WhatsApp" else "Enviar TODOS (${exportProspects.size}) para WhatsApp",color=Color.White)}
      if(splitThirty&&groups.size>1){
       groups.forEachIndexed{index,group->
        OutlinedButton(onClick={
+        selectedBatch=index
         val content="DALCOTONE | Parte ${index+1}/${groups.size}\\n\\n"+group.joinToString("\\n\\n")
         val intent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,content)}
         startActivity(Intent.createChooser(intent,"Compartilhar parte ${index+1}"))
